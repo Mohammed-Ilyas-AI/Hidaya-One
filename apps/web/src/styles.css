@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #051111;
+    --bg-surface: #0a1e1c;
+    --bg-card: #0d2825;
+    --border-color: #16403b;
+    --emerald-primary: #00A878;
+    --emerald-accent: #00D09C;
+    --gold-accent: #D4AF37;
+    --gold-glow: #F3E5AB;
+  }
+}
+
+/* Arabic typography class */
+.font-arabic {
+  font-family: 'Amiri', serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #051111;
+}
+::-webkit-scrollbar-thumb {
+  background: #16403b;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00A878;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(13, 40, 37, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(22, 64, 59, 0.8);
+}

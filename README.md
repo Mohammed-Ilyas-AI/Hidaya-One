@@ -1,110 +1,66 @@
-# HIDAYA ONE — ADK TypeScript starter
+# HIDAYA ONE — Monorepo
 
-This is a code-first TypeScript port of the nine main roles in the Agent Studio export.
+> Islamic educational Shorts automation platform.
+> Built on Google ADK TypeScript, Node.js, Angular 22, Cloud Run.
 
-## Important distinction
+## Repository structure
 
-The Google Cloud Agent Studio **Get code** flow in your screenshot generated Python (`agent.py`). That Python file is not Node.js code and cannot be pasted into an ADK TypeScript project. This folder re-creates the agent roles with Google's TypeScript ADK package.
-
-This starter preserves:
-- 9 main agents (Orchestrator + 8 specialist agents)
-- 4 internal helper agents (Google Search and URL Context helpers for Research and Verification)
-
-So the source contains 13 `LlmAgent` instances in total, while retaining the same 9 main roles.
-
-## What is and is not connected
-
-Configured in code:
-- Gemini 3.8 Flash model ID
-- ADK TypeScript agents and sub-agent delegation
-- Google Search helper agents
-- URL Context helper agents
-
-Not connected yet:
-- Veo video generation API
-- Female Tamil TTS
-- Cloud Storage asset persistence
-- Video rendering / assembly service
-- YouTube OAuth and Data API upload
-- Instagram Graph API publishing
-- Persistent topic/history database
-
-Those agents return technical briefs and explicit NOT_CONNECTED statuses. They do not pretend to generate files or publish videos.
-
-## Requirements
-
-Use the current official ADK TypeScript quickstart prerequisites:
-- Node.js 24.13.0 or later
-- npm 11.8.0 or later
-
-## Run in Google Cloud Shell (browser-based)
-
-1. Open Google Cloud Console and start Cloud Shell.
-2. Upload/extract this folder into Cloud Shell, or clone the project from your Git repository.
-3. Check the runtime:
-
-```bash
-node --version
-npm --version
+```
+hidaya-one/
+├── apps/
+│   ├── agent/     ← ADK TypeScript agents (deployed to hidaya-one-dev)
+│   ├── api/       ← Node.js BFF API (Express 5 + Zod)
+│   └── web/       ← Angular 22 dashboard
+├── packages/
+│   └── contracts/ ← OpenAPI spec + Zod schemas (shared types)
+├── infra/
+│   └── scripts/   ← Cloud Run, IAM, Secret Manager scripts
+└── docs/
 ```
 
-4. Install dependencies:
+## Key facts
+
+| Item | Value |
+|---|---|
+| GCP project | `even-boulder-514217-d5` |
+| Project number | `440186659444` |
+| Region | `asia-south1` |
+| Dev service URL | `https://hidaya-one-dev-440186659444.asia-south1.run.app` |
+| Stable tag | `v0.1.0-stable-pre-monorepo` |
+| Feature branch | `feature/hidaya-one-monorepo-dashboard` |
+
+## Quick start (agent)
 
 ```bash
+cd apps/agent
+cp .env.example .env     # fill in GOOGLE_GENAI_API_KEY
 npm install
+npm run adk:web          # opens ADK dev UI on localhost:8000
 ```
 
-5. Copy `.env.example` to `.env`, then replace `YOUR_GOOGLE_CLOUD_PROJECT_ID` with your project ID. Do not commit `.env`.
+## Security
 
-```bash
-cp .env.example .env
-```
+- `.env` is in `.gitignore` — never committed.
+- Secrets in Cloud Run via Secret Manager (see `infra/scripts/inject-secrets.sh`).
+- `hidaya-one-dev` currently has `allUsers` invoker — remove with `infra/scripts/remove-public-access.sh`.
+- All publishing requires explicit human approval — never automatic.
 
-6. Authenticate with Google Cloud for Vertex AI:
+## Religious safety
 
-```bash
-gcloud auth login
-gcloud auth application-default login
-gcloud config set project YOUR_GOOGLE_CLOUD_PROJECT_ID
-```
+The deterministic verification gate (`apps/agent/src/verification/gate.ts`) is a
+software function — not an LLM instruction — that validates all evidence before
+any scriptwriting begins. 23 unit tests cover all bypass scenarios.
 
-7. Start the ADK development chat UI:
+## Status by phase
 
-```bash
-npm run adk:web
-```
-
-The ADK Web UI is for local development and debugging, not production hosting. Open the URL printed by the command (normally port 8000).
-
-Alternatively, run a single CLI interaction:
-
-```bash
-npm run adk:run
-```
-
-## First test prompt
-
-```text
-Start a Hidaya One daily research batch.
-Return three distinct topic candidates with exact primary Quran/Hadith source URLs.
-Do not draft scripts for any item that is not independently VERIFIED.
-Return a research report and state the missing evidence clearly.
-Do not generate videos or publish anything.
-```
-
-## Important architecture note
-
-This initial TypeScript port uses ADK `LlmAgent` sub-agent delegation, matching the exported Agent Studio structure. LLM delegation is not a hard deterministic gate. Before production, we must implement an ADK 2 graph-based Workflow with explicit validation nodes and branches so a failed religious verification blocks all downstream production. ADK TypeScript 2.0 supports graph-based workflows; the old `SequentialAgent` templates are deprecated in TypeScript.
-
-## Next milestones
-
-1. Confirm this project runs in ADK Web.
-2. Verify Google Search and URL Context events.
-3. Add typed evidence records and deterministic religious validation.
-4. Add an ADK graph workflow with fail-closed branches.
-5. Connect Veo, TTS, storage and renderer through real backend tools.
-6. Connect YouTube OAuth; test with private uploads only.
-7. Add Meta Graph API only after Instagram Professional account authorization.
-8. Add Cloud Scheduler after an authenticated production endpoint exists.
-
-Do not deploy publicly or enable publishing from this starter.
+| Phase | Status |
+|---|---|
+| Phase 0 — Audit & backup | ✅ Complete |
+| Phase 1 — Agent testing | 🔶 Blocked (Gemini API key restricted — see docs/deployment.md) |
+| Phase 2 — Verification gate | ✅ Complete — 23/23 tests pass |
+| Phase 3 — Integration adapters | 🔶 In progress |
+| Phase 4 — Persistence | ⬜ Not started |
+| Phase 5 — Node.js API | ✅ Scaffolded |
+| Phase 6 — Angular dashboard | ⬜ Not started |
+| Phase 7 — Secure deployment | 🔶 In progress |
+| Phase 8 — Testing | 🔶 Gate tests complete |

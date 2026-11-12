@@ -1,0 +1,22 @@
+{
+  "name": "hidaya-one-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "agent.ts",
+  "scripts": {
+    "adk:web": "adk web",
+    "adk:run": "adk run agent.ts",
+    "typecheck": "tsc --noEmit",
+    "test:gate": "tsx src/verification/gate.test.ts",
+    "test": "npm run typecheck && npm run test:gate"
+  },
+  "dependencies": {
+    "@google/adk": "^2.4.0"
+  },
+  "devDependencies": {
+    "@google/adk-devtools": "^2.4.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0"
+  }
+}

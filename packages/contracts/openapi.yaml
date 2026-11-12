@@ -1,0 +1,214 @@
+openapi: "3.1.0"
+info:
+  title: Hidaya One API
+  version: "0.1.0"
+  description: |
+    Backend For Frontend (BFF) contract for the Hidaya One Islamic Shorts
+    automation platform. The Angular dashboard communicates only with these
+    endpoints — never directly with the ADK agent service or Gemini.
+
+servers:
+  - url: https://hidaya-one-dashboard-440186659444.asia-south1.run.app/api/v1
+    description: Production (Cloud Run — IAP protected)
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Service health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /integrations:
+    get:
+      summary: Integration statuses
+      operationId: getIntegrations
+      responses:
+        "200":
+          description: Real-time integration status (never hardcoded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationsResponse"
+
+  /dashboard/overview:
+    get:
+      summary: Dashboard overview
+      operationId: getDashboardOverview
+      responses:
+        "200":
+          description: Production overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverview"
+
+  /research/runs:
+    post:
+      summary: Start a new research run
+      operationId: startResearchRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResearchRunRequest"
+      responses:
+        "202":
+          description: Research run started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchRunResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/NotConfigured"
+
+  /videos/{id}/approve:
+    post:
+      summary: Human approval for video — required before publish
+      operationId: approveVideo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+        "503":
+          $ref: "#/components/responses/NotConfigured"
+
+  /publishing/{id}/approve:
+    post:
+      summary: Explicit owner approval to publish — never auto-triggered
+      operationId: approvePublishing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Publishing approved
+        "503":
+          $ref: "#/components/responses/NotConfigured"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service, version, ts]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+        version:
+          type: string
+        env:
+          type: string
+        ts:
+          type: string
+          format: date-time
+
+    IntegrationStatus:
+      type: string
+      enum:
+        - CONNECTED
+        - NOT_CONFIGURED
+        - DISABLED
+        - DEGRADED
+        - FAILED
+
+    Integration:
+      type: object
+      required: [name, status, reason]
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/IntegrationStatus"
+        reason:
+          type: string
+
+    IntegrationsResponse:
+      type: object
+      required: [integrations]
+      properties:
+        integrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Integration"
+
+    DashboardOverview:
+      type: object
+      properties:
+        dailyTarget:
+          type: integer
+        activeJobs:
+          type: string
+        pendingApprovals:
+          type: string
+        integrationsSummary:
+          type: object
+
+    ResearchRunRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 3
+          maxLength: 500
+        userId:
+          type: string
+        sessionId:
+          type: string
+
+    ResearchRunResponse:
+      type: object
+      required: [sessionId, userId, status]
+      properties:
+        sessionId:
+          type: string
+        userId:
+          type: string
+        status:
+          type: string
+          enum: [RUNNING]
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotConfigured:
+      description: Integration or persistence not yet configured
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
