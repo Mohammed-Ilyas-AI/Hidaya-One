@@ -1,0 +1,18 @@
+{
+  "name": "hidaya-one-adk-typescript",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "agent.ts",
+  "scripts": {
+    "adk:web": "npx @google/adk-devtools web",
+    "adk:run": "npx @google/adk-devtools run agent.ts"
+  },
+  "dependencies": {
+    "@google/adk": "^2.4.0"
+  },
+  "devDependencies": {
+    "@google/adk-devtools": "^2.4.0",
+    "typescript": "^5.9.0"
+  }
+}
