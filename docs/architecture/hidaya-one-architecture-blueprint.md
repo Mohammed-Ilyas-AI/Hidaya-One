@@ -838,11 +838,79 @@ Integrate YouTube OAuth and Instagram authorization.
 Implement publication tracking and performance intelligence.
 
 **PHASE 10 — Production Hardening**
+Security review, reliability tests, backup, monitoring and cost optimization.
 
-> **Source truncated here.** The document as received ended mid-heading at
-> "PHASE 10 — Production Harde". The Phase 10 description and any sections after
-> it (including the definition of a completed feature referred to in the
-> introduction) are not recorded and need to be supplied by the owner.
+# 19. Definition of Done
+
+Hidaya One is not considered complete because the frontend loads or the agents return conversational responses.
+
+The platform is operational only when:
+
+1. All 13 agents are preserved and their actual execution is verified.
+2. Research uses real source retrieval.
+3. Independent religious verification works.
+4. Invalid evidence is blocked by deterministic code.
+5. Tamil scripts are generated only from approved evidence.
+6. Media generation uses real connected providers.
+7. Video rendering produces real files.
+8. QC results are recorded.
+9. Human approval is enforced.
+10. YouTube OAuth works for authorized uploads.
+11. Persistent workflow records survive service restarts.
+12. The Angular dashboard communicates with the actual backend.
+13. Security and deployment checks pass.
+14. All external actions report truthful outcomes.
+
+# 20. Instructions for Claude Code
+
+Act as the Principal Engineer responsible for implementing this architecture.
+
+Before modifying code:
+
+1. Inspect the entire existing repository.
+2. Read all existing agent instructions.
+3. Read the architecture and integration documentation.
+4. Understand existing Cloud Run services.
+5. Preserve all working implementations.
+6. Identify gaps between the target architecture and current implementation.
+
+Implement in small, independently testable milestones.
+
+Maintain:
+
+- CLAUDE.md
+- ARCHITECTURE.md
+- IMPLEMENTATION_PLAN.md
+- SECURITY.md
+- INTEGRATIONS.md
+- TESTING.md
+- CHANGELOG.md
+
+Use CLAUDE.md as the project-specific operating guide for Claude Code.
+
+Use the architecture document as the source of truth for system design.
+
+Do not rewrite the entire application in one operation.
+
+Do not mark an integration complete without a successful real test.
+
+Do not deploy untested changes over the stable service.
+
+Do not publish videos publicly without explicit owner approval.
+
+For every milestone, report:
+
+- Changes made.
+- Files created or modified.
+- Commands executed.
+- Tests passed and failed.
+- Integrations connected and disconnected.
+- Remaining blockers.
+- Security implications.
+- Estimated operating costs.
+- Recommended next milestone.
+
+The goal is to build a maintainable, secure, reliable and genuinely operational AI-powered Islamic content production platform.
 
 ---
 
@@ -855,7 +923,7 @@ section is not part of the owner's blueprint; update it as the code changes.
 | --- | --- |
 | 13 ADK agent instances (§6) | Present in a single root-level `agent.ts` as `LlmAgent`s with sub-agent delegation |
 | Monorepo layout `apps/`, `packages/`, `infra/` (§5) | Not present; the repository is a flat single-package ADK starter |
-| Deterministic validation gate and attestation (§7) | Not present; verification is enforced by LLM instructions only |
+| Deterministic validation gate and attestation (§7) | Implemented and unit-tested in `verification/`; not yet wired into the agent flow, which still relies on LLM instructions |
 | Graph workflow with fail-closed branches (§3.2, §8) | Not present |
 | Backend API, job manager, persistence (§5.2, §10, §11) | Not present in this repository |
 | Angular dashboard (§5.3, §12) | Not present in this repository |

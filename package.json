@@ -6,10 +6,13 @@
   "main": "agent.ts",
   "scripts": {
     "adk:web": "npx @google/adk-devtools web",
-    "adk:run": "npx @google/adk-devtools run agent.ts"
+    "adk:run": "npx @google/adk-devtools run agent.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"verification/**/*.test.ts\""
   },
   "dependencies": {
-    "@google/adk": "^2.4.0"
+    "@google/adk": "^2.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@google/adk-devtools": "^2.4.0",

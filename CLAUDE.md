@@ -16,7 +16,11 @@ A flat, single-package Google ADK TypeScript starter (Node.js 24, ESM):
 - `agent.ts` — all 13 `LlmAgent` instances (orchestrator, 8 specialists, 4
   Google Search / URL Context helpers). `rootAgent` is the entry point.
 - `npm run adk:web` — ADK dev UI (local only). `npm run adk:run` — one CLI run.
-- `npx tsc --noEmit` — type check. There is no test suite yet.
+- `verification/` — typed evidence contracts and the deterministic religious
+  validation gate (`evaluateEvidence`, `evaluateBatch`, `verifyAttestation`).
+  Pure code, unit-tested, **not yet wired into the agent flow**.
+- `npm run typecheck`, `npm test` (Node's built-in runner, runs `.ts` directly;
+  relative imports use `.ts` extensions).
 
 The monorepo (`apps/agent`, `apps/api`, `apps/web`, `packages/*`, `infra/`),
 backend, Angular dashboard and all media/publishing integrations in the
@@ -45,6 +49,19 @@ blueprint are not in this repository yet.
    The ADK dev UI is never publicly exposed.
 7. **Cost is bounded.** Budget is about ₹2,000/month. No unbounded generation
    or retry loops; check pricing and quotas before enabling a paid service.
+
+## Working method
+
+- Small, independently testable milestones; never rewrite the application in
+  one operation, and preserve working implementations.
+- "Done" is defined by blueprint §19: real execution, not a UI that loads or an
+  agent that replies.
+- Keep these current as part of each milestone: `CLAUDE.md`, `ARCHITECTURE.md`,
+  `IMPLEMENTATION_PLAN.md`, `SECURITY.md`, `INTEGRATIONS.md`, `TESTING.md`,
+  `CHANGELOG.md`.
+- End each milestone with the report in blueprint §20: changes, files, commands,
+  tests passed/failed, integrations connected/disconnected, blockers, security
+  implications, estimated operating cost, recommended next milestone.
 
 ## Engineering conventions
 
