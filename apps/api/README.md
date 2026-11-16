@@ -9,3 +9,4 @@ npm run dev      # Starts API on http://localhost:3000
 npm run build    # Compiles TypeScript to dist/
 npm run typecheck # Verifies TypeScript types
 ```
+

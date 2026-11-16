@@ -57,3 +57,4 @@ import { ApiService } from '../../services/api.service';
 export class PublishingComponent {
   apiService = inject(ApiService);
 }
+

@@ -42,3 +42,4 @@ import { ApiService } from '../../services/api.service';
 export class SettingsComponent {
   apiService = inject(ApiService);
 }
+

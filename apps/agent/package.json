@@ -8,15 +8,15 @@
     "adk:web": "adk web",
     "adk:run": "adk run agent.ts",
     "typecheck": "tsc --noEmit",
-    "test:gate": "tsx src/verification/gate.test.ts",
-    "test": "npm run typecheck && npm run test:gate"
+    "test:unit": "node --test \"src/verification/**/*.test.ts\" \"src/workflow/**/*.test.ts\"",
+    "test": "npm run typecheck && npm run test:unit"
   },
   "dependencies": {
-    "@google/adk": "^2.4.0"
+    "@google/adk": "^2.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@google/adk-devtools": "^2.4.0",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.0"
   }
 }

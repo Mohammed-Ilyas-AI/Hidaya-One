@@ -75,3 +75,4 @@ export class VerificationComponent {
     { name: 'Attestation literal set strictly by gate function', result: 'PASS' },
   ];
 }
+

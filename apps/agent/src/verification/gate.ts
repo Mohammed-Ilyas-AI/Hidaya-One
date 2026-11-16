@@ -1,207 +1,501 @@
-/**
- * HIDAYA ONE — Deterministic Religious Verification Gate
- *
- * This is NOT an LLM instruction. It is a typed, deterministic software
- * function that validates EvidenceRecord[] before any scriptwriting begins.
- *
- * Rules:
- *  1. Every item must have verificationStatus === "VERIFIED".
- *  2. Quran items must have arabicText, surah ∈ [1,114], ayah ≥ 1, sourceUrl.
- *  3. Hadith items must have arabicText, hadithNumber, at least one grade
- *     with a named scholar, and a sourceUrl.
- *  4. gatePassed must NOT already be set to true by any agent.
- *     The gate itself sets gatePassed.
- *  5. Any item that fails results in the entire batch failing.
- *  6. Attestation literal is set only here — never accepted from agent output.
- */
-
-import type {
-  EvidenceRecord,
-  VerifiedEvidencePackage,
-  VerificationStatus,
-} from "./types.js";
-
-export interface GateResult {
-  passed: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
-// Known valid Surah ayah counts (1-indexed). Subset — extend as needed.
-const SURAH_AYAH_COUNTS: Record<number, number> = {
-  1: 7, 2: 286, 3: 200, 4: 176, 5: 120, 6: 165, 7: 206, 8: 75,
-  9: 129, 10: 109, 11: 123, 12: 111, 13: 43, 14: 52, 15: 99,
-  16: 128, 17: 111, 18: 110, 19: 98, 20: 135, 21: 112, 22: 78,
-  23: 118, 24: 64, 25: 77, 26: 227, 27: 93, 28: 88, 29: 69,
-  30: 60, 31: 34, 32: 30, 33: 73, 34: 54, 35: 45, 36: 83,
-  37: 182, 38: 88, 39: 75, 40: 85, 41: 54, 42: 53, 43: 89,
-  44: 59, 45: 37, 46: 35, 47: 38, 48: 29, 49: 18, 50: 45,
-  51: 60, 52: 49, 53: 62, 54: 55, 55: 78, 56: 96, 57: 29,
-  58: 22, 59: 24, 60: 13, 61: 14, 62: 11, 63: 11, 64: 18,
-  65: 12, 66: 12, 67: 30, 68: 52, 69: 52, 70: 44, 71: 28,
-  72: 28, 73: 20, 74: 56, 75: 40, 76: 31, 77: 50, 78: 40,
-  79: 46, 80: 42, 81: 29, 82: 19, 83: 36, 84: 25, 85: 22,
-  86: 17, 87: 19, 88: 26, 89: 30, 90: 20, 91: 15, 92: 21,
-  93: 11, 94: 8, 95: 8, 96: 19, 97: 5, 98: 8, 99: 8,
-  100: 11, 101: 11, 102: 8, 103: 3, 104: 9, 105: 5, 106: 4,
-  107: 7, 108: 3, 109: 6, 110: 3, 111: 5, 112: 4, 113: 5, 114: 6,
-};
-
-const ALLOWED_STATUSES_TO_ENTER: VerificationStatus[] = ["VERIFIED"];
-
-function validateQuranItem(record: EvidenceRecord): string[] {
-  const errors: string[] = [];
-  const ref = record.quranRef;
-  if (!ref) {
-    errors.push(`[${record.id}] QURAN record missing quranRef.`);
-    return errors;
-  }
-  if (!ref.arabicText || ref.arabicText.trim().length < 3) {
-    errors.push(`[${record.id}] Quran arabicText is missing or too short.`);
-  }
-  if (!ref.surah || ref.surah < 1 || ref.surah > 114) {
-    errors.push(`[${record.id}] Quran surah ${ref.surah} out of range [1–114].`);
-  } else {
-    const maxAyah = SURAH_AYAH_COUNTS[ref.surah];
-    if (maxAyah !== undefined && (ref.ayah < 1 || ref.ayah > maxAyah)) {
-      errors.push(
-        `[${record.id}] Surah ${ref.surah} has ${maxAyah} ayahs — ayah ${ref.ayah} invalid.`,
-      );
-    }
-  }
-  if (!ref.sourceUrl || !ref.sourceUrl.startsWith("http")) {
-    errors.push(`[${record.id}] Quran sourceUrl missing or malformed.`);
-  }
-  if (!ref.retrievedAt) {
-    errors.push(`[${record.id}] Quran retrievedAt timestamp missing.`);
-  }
-  return errors;
-}
-
-function validateHadithItem(record: EvidenceRecord): string[] {
-  const errors: string[] = [];
-  const ref = record.hadithRef;
-  if (!ref) {
-    errors.push(`[${record.id}] HADITH record missing hadithRef.`);
-    return errors;
-  }
-  if (!ref.arabicText || ref.arabicText.trim().length < 3) {
-    errors.push(`[${record.id}] Hadith arabicText is missing or too short.`);
-  }
-  if (!ref.collection || ref.collection.trim().length === 0) {
-    errors.push(`[${record.id}] Hadith collection name is missing.`);
-  }
-  if (!ref.hadithNumber || ref.hadithNumber < 1) {
-    errors.push(`[${record.id}] Hadith number invalid.`);
-  }
-  if (!ref.grades || ref.grades.length === 0) {
-    errors.push(`[${record.id}] Hadith has no authenticity grades.`);
-  } else {
-    for (const grade of ref.grades) {
-      if (!grade.scholar || grade.scholar.trim().length === 0 ||
-          grade.scholar.toLowerCase().includes("various")) {
-        errors.push(
-          `[${record.id}] Hadith grade has unnamed/vague scholar: "${grade.scholar}".`,
-        );
-      }
-      if (!grade.grade || grade.grade.trim().length === 0) {
-        errors.push(`[${record.id}] Hadith grade value is empty for scholar "${grade.scholar}".`);
-      }
-    }
-  }
-  if (!ref.sourceUrl || !ref.sourceUrl.startsWith("http")) {
-    errors.push(`[${record.id}] Hadith sourceUrl missing or malformed.`);
-  }
-  if (!ref.retrievedAt) {
-    errors.push(`[${record.id}] Hadith retrievedAt timestamp missing.`);
-  }
-  return errors;
-}
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { compareArabic, type DiacriticDifference } from "./arabic.ts";
+import {
+  EvidenceCandidateSchema,
+  VerificationRecordSchema,
+  type EvidenceCandidate,
+  type Grading,
+  type Reference,
+  type VerificationRecord,
+  type VerificationStatus,
+} from "./contracts.ts";
+import { checkSource, type SourceRegistry, type SourceRole } from "./source-registry.ts";
 
 /**
- * Run the deterministic verification gate.
- * Returns a GateResult. If passed === true, also returns the
- * VerifiedEvidencePackage (attestation set here, not by any agent).
+ * Deterministic religious validation gate (blueprint §7).
+ *
+ * The gate takes the Research Agent's candidate and the Verification Agent's
+ * record, re-checks them in code, and decides. No input field can force a
+ * pass: the decision and its attestation are produced here and nowhere else.
+ * Every check fails closed.
+ *
+ * Status policy:
+ *   VERIFIED            -> PASSED only if every check here also passes
+ *   NEEDS_HUMAN_REVIEW  -> HUMAN_REVIEW
+ *   anything else       -> BLOCKED (the workflow stops for that record)
+ * A blocked or reviewed record is never upgraded; a corrected record must go
+ * through a new verification run, which produces a different digest.
  */
-export function runVerificationGate(
-  topicId: string,
-  records: EvidenceRecord[],
-): { gateResult: GateResult; package?: VerifiedEvidencePackage } {
-  const errors: string[] = [];
-  const warnings: string[] = [];
 
-  if (!records || records.length === 0) {
-    return {
-      gateResult: {
-        passed: false,
-        errors: ["No evidence records provided to verification gate."],
-        warnings: [],
-      },
-    };
+export const GATE_VERSION = "2";
+export const MIN_ATTESTATION_KEY_LENGTH = 32;
+
+export type GateOutcome = "PASSED" | "HUMAN_REVIEW" | "BLOCKED";
+
+export interface GateAttestation {
+  gateVersion: string;
+  registryVersion: string;
+  evidenceId: string;
+  /** SHA-256 of the exact candidate and verification record that passed. */
+  evidenceDigest: string;
+  issuedAt: string;
+  /** HMAC-SHA256 over the fields above, keyed with the gate's secret. */
+  signature: string;
+}
+
+/** Recorded when two Arabic texts are not identical. Both originals are kept. */
+export interface ArabicDifferenceRecord {
+  kind: "DIACRITICS_ONLY" | "DIFFERENT";
+  candidateArabicText: string;
+  verificationArabicText: string;
+  /** Exact per-character mark differences; empty when kind is DIFFERENT. */
+  diacriticDifferences: DiacriticDifference[];
+}
+
+export interface GateDecision {
+  evidenceId: string | null;
+  outcome: GateOutcome;
+  status: VerificationStatus;
+  reasons: string[];
+  gateVersion: string;
+  registryVersion: string;
+  decidedAt: string;
+  /** Digest of the evaluated records; null when they could not be parsed. */
+  evidenceDigest: string | null;
+  arabicDifference: ArabicDifferenceRecord | null;
+  /**
+   * How far apart the two retrievals were. Informational: two reads of the
+   * same page are weaker corroboration than two different sources.
+   */
+  corroboration: "SAME_URL" | "SAME_HOST" | "DIFFERENT_HOST" | null;
+  /** Present only when outcome is PASSED. */
+  attestation: GateAttestation | null;
+}
+
+export interface BatchDecision {
+  /** True only when the batch is non-empty and every record passed. */
+  fullyVerified: boolean;
+  decisions: GateDecision[];
+}
+
+export interface GateConfig {
+  /** Secret used to sign attestations. Without it the gate cannot pass anything. */
+  attestationKey: string | undefined;
+  registry: SourceRegistry;
+  now?: () => Date;
+}
+
+function normalizeLabel(value: string): string {
+  return value.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function sameReference(a: Reference, b: Reference): boolean {
+  if (a.kind === "QURAN" && b.kind === "QURAN") {
+    return a.surah === b.surah && a.ayahStart === b.ayahStart && a.ayahEnd === b.ayahEnd;
   }
-
-  for (const record of records) {
-    // Rule 1: Status must be VERIFIED (set by Verification Agent, not gate)
-    if (!ALLOWED_STATUSES_TO_ENTER.includes(record.verificationStatus)) {
-      errors.push(
-        `[${record.id}] Status is "${record.verificationStatus}" — only VERIFIED may pass gate.`,
-      );
-      continue; // still check structure for diagnostics
-    }
-
-    // Rule 2: gatePassed must NOT already be true (would indicate bypass attempt)
-    if ((record as any).gatePassed === true) {
-      errors.push(
-        `[${record.id}] gatePassed was pre-set to true — potential bypass attempt. REJECTED.`,
-      );
-      continue;
-    }
-
-    // Rule 3: Type-specific structural validation
-    if (record.type === "QURAN") {
-      errors.push(...validateQuranItem(record));
-    } else if (record.type === "HADITH") {
-      errors.push(...validateHadithItem(record));
-    } else if (record.type === "SCHOLARLY_OPINION") {
-      if (!record.scholarlyOpinion || record.scholarlyOpinion.trim().length < 10) {
-        warnings.push(`[${record.id}] SCHOLARLY_OPINION text is very short or missing.`);
-      }
-    }
-
-    // Rule 4: verificationNotes must be present
-    if (!record.verificationNotes || record.verificationNotes.trim().length === 0) {
-      errors.push(`[${record.id}] verificationNotes is empty — verification appears incomplete.`);
-    }
-
-    // Rule 5: verifiedBy must be present
-    if (!record.verifiedBy || record.verifiedBy.trim().length === 0) {
-      errors.push(`[${record.id}] verifiedBy agent name missing.`);
-    }
+  if (a.kind === "HADITH" && b.kind === "HADITH") {
+    return (
+      normalizeLabel(a.collection) === normalizeLabel(b.collection) &&
+      normalizeLabel(a.hadithNumber) === normalizeLabel(b.hadithNumber)
+    );
   }
+  return false;
+}
 
-  if (errors.length > 0) {
-    return {
-      gateResult: { passed: false, errors, warnings },
-    };
+function gradingKeys(gradings: readonly Grading[]): Set<string> {
+  return new Set(gradings.map((g) => `${normalizeLabel(g.scholar)}\u0000${normalizeLabel(g.grade)}`));
+}
+
+function corroborationOf(a: string, b: string): GateDecision["corroboration"] {
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    if (ua.href === ub.href) return "SAME_URL";
+    return ua.hostname.toLowerCase() === ub.hostname.toLowerCase() ? "SAME_HOST" : "DIFFERENT_HOST";
+  } catch {
+    return null;
   }
+}
 
-  // All records passed — set gatePassed and attestation here (and only here)
-  const passedRecords: EvidenceRecord[] = records.map((r) => ({
-    ...r,
-    gatePassed: true,
-    gateReason: "Passed deterministic verification gate.",
-  }));
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : 1));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
 
-  const verifiedPackage: VerifiedEvidencePackage = {
-    topicId,
-    evidenceItems: passedRecords,
-    verificationCompletedAt: new Date().toISOString(),
-    attestation: "ALL_EVIDENCE_GATE_PASSED",
+function digestEvidence(candidate: EvidenceCandidate, verification: VerificationRecord): string {
+  return createHash("sha256").update(canonicalJson({ candidate, verification })).digest("hex");
+}
+
+function sign(fields: Omit<GateAttestation, "signature">, key: string): string {
+  return createHmac("sha256", key).update(canonicalJson(fields)).digest("hex");
+}
+
+export function isUsableAttestationKey(key: string | undefined): key is string {
+  return typeof key === "string" && key.length >= MIN_ATTESTATION_KEY_LENGTH;
+}
+
+export function evaluateEvidence(
+  candidateInput: unknown,
+  verificationInput: unknown,
+  config: GateConfig,
+): GateDecision {
+  const base = {
+    gateVersion: GATE_VERSION,
+    registryVersion: config.registry.version,
+    decidedAt: (config.now?.() ?? new Date()).toISOString(),
   };
+  const candidateResult = EvidenceCandidateSchema.safeParse(candidateInput);
+  const verificationResult = VerificationRecordSchema.safeParse(verificationInput);
+  if (!candidateResult.success || !verificationResult.success) {
+    const reasons = [
+      ...(candidateResult.success ? [] : candidateResult.error.issues.map((i) => `candidate.${i.path.join(".")}: ${i.message}`)),
+      ...(verificationResult.success ? [] : verificationResult.error.issues.map((i) => `verification.${i.path.join(".")}: ${i.message}`)),
+    ];
+    return {
+      ...base,
+      evidenceId: candidateResult.success ? candidateResult.data.evidenceId : null,
+      outcome: "BLOCKED",
+      status: "REJECTED",
+      reasons,
+      evidenceDigest: null,
+      arabicDifference: null,
+      corroboration: null,
+      attestation: null,
+    };
+  }
 
+  const candidate = candidateResult.data;
+  const verification = verificationResult.data;
+  const id = candidate.evidenceId;
+  const evidenceDigest = digestEvidence(candidate, verification);
+  const corroboration = corroborationOf(candidate.sourceUrl, verification.sourceUrl);
+  let arabicDifference: ArabicDifferenceRecord | null = null;
+
+  const finish = (outcome: Exclude<GateOutcome, "PASSED">, status: VerificationStatus, reasons: string[]): GateDecision => ({
+    ...base,
+    evidenceId: id,
+    outcome,
+    status,
+    reasons,
+    evidenceDigest,
+    arabicDifference,
+    corroboration,
+    attestation: null,
+  });
+
+  // The agent's own non-VERIFIED verdict is never upgraded.
+  if (verification.status === "NEEDS_HUMAN_REVIEW") {
+    return finish("HUMAN_REVIEW", "NEEDS_HUMAN_REVIEW", ["Verification Agent requested human review."]);
+  }
+  if (verification.status !== "VERIFIED") {
+    return finish("BLOCKED", verification.status, [`Verification Agent returned ${verification.status}.`]);
+  }
+
+  // From here the agent claims VERIFIED; the gate re-checks the claim.
+  const blocked: Array<[VerificationStatus, string]> = [];
+  const review: string[] = [];
+
+  if (verification.evidenceId !== id) {
+    blocked.push(["REFERENCE_MISMATCH", "Verification record does not reference this candidate's evidence ID."]);
+  }
+  if (normalizeLabel(verification.verifiedBy) === normalizeLabel(candidate.researchedBy)) {
+    blocked.push(["REJECTED", "Verification was not independent: the verifier identity is the researcher identity."]);
+  }
+
+  for (const [label, ref] of [["candidate", candidate.reference], ["verification", verification.reference]] as const) {
+    if (ref.kind === "QURAN" && ref.ayahEnd < ref.ayahStart) {
+      blocked.push(["REFERENCE_MISMATCH", `${label}: ayah range ends before it starts.`]);
+    }
+  }
+  if (!sameReference(candidate.reference, verification.reference)) {
+    blocked.push(["REFERENCE_MISMATCH", "Researched and independently verified references differ."]);
+  }
+
+  const textRole: SourceRole = candidate.reference.kind === "QURAN" ? "QURAN_TEXT" : "HADITH_TEXT";
+  for (const [label, url] of [["candidate", candidate.sourceUrl], ["verification", verification.sourceUrl]] as const) {
+    const check = checkSource(url, textRole, config.registry);
+    if (check.result === "INVALID_URL") {
+      blocked.push(["SOURCE_NOT_FOUND", `${label}: source URL is not a valid https URL.`]);
+    } else if (check.result === "UNREGISTERED_HOST") {
+      review.push(`${label}: source host ${check.host} is not in the trusted-source registry.`);
+    } else if (check.result === "WRONG_ROLE") {
+      review.push(`${label}: source host ${check.host} is not registered for ${textRole}.`);
+    }
+  }
+
+  const comparison = compareArabic(candidate.arabicText, verification.arabicText);
+  if (!/\p{Script=Arabic}/u.test(candidate.arabicText) || !/\p{Script=Arabic}/u.test(verification.arabicText)) {
+    blocked.push(["ARABIC_MISMATCH", "Arabic wording contains no Arabic script."]);
+  } else if (comparison.kind === "DIFFERENT") {
+    arabicDifference = {
+      kind: "DIFFERENT",
+      candidateArabicText: candidate.arabicText,
+      verificationArabicText: verification.arabicText,
+      diacriticDifferences: [],
+    };
+    blocked.push(["ARABIC_MISMATCH", "Researched and independently verified Arabic wording differ."]);
+  } else if (comparison.kind === "DIACRITICS_ONLY") {
+    arabicDifference = {
+      kind: "DIACRITICS_ONLY",
+      candidateArabicText: candidate.arabicText,
+      verificationArabicText: verification.arabicText,
+      diacriticDifferences: comparison.differences,
+    };
+    review.push(
+      `Arabic wording differs only in diacritics at ${comparison.differences.length} character position(s); both texts are recorded.`,
+    );
+  }
+
+  if (candidate.reference.kind === "HADITH") {
+    if (verification.gradings.length === 0) {
+      blocked.push(["AUTHENTICITY_UNCONFIRMED", "No authenticity grade with a named scholar was verified."]);
+    } else {
+      const confirmed = gradingKeys(verification.gradings);
+      for (const key of gradingKeys(candidate.gradings)) {
+        if (!confirmed.has(key)) {
+          blocked.push(["AUTHENTICITY_UNCONFIRMED", "A researched grading was not confirmed by verification."]);
+          break;
+        }
+      }
+    }
+    const gradingSources: Array<[string, string]> = [
+      ...candidate.gradings.map((g): [string, string] => ["candidate", g.sourceUrl ?? candidate.sourceUrl]),
+      ...verification.gradings.map((g): [string, string] => ["verification", g.sourceUrl ?? verification.sourceUrl]),
+    ];
+    for (const [label, url] of gradingSources) {
+      const check = checkSource(url, "GRADING_EVIDENCE", config.registry);
+      if (check.result === "INVALID_URL") {
+        blocked.push(["AUTHENTICITY_UNCONFIRMED", `${label}: grading source URL is not a valid https URL.`]);
+      } else if (check.result !== "OK") {
+        review.push(`${label}: grading source host ${check.host} is not registered for GRADING_EVIDENCE.`);
+      }
+    }
+  }
+
+  if (blocked.length > 0) {
+    return finish("BLOCKED", blocked[0][0], [...new Set(blocked.map(([, reason]) => reason))]);
+  }
+  if (review.length > 0) {
+    return finish("HUMAN_REVIEW", "NEEDS_HUMAN_REVIEW", [...new Set(review)]);
+  }
+
+  const key = config.attestationKey;
+  if (!isUsableAttestationKey(key)) {
+    return finish("BLOCKED", "REJECTED", ["Gate attestation key is not configured; nothing can pass."]);
+  }
+
+  const fields = {
+    gateVersion: GATE_VERSION,
+    registryVersion: config.registry.version,
+    evidenceId: id,
+    evidenceDigest,
+    issuedAt: base.decidedAt,
+  };
   return {
-    gateResult: { passed: true, errors: [], warnings },
-    package: verifiedPackage,
+    ...base,
+    evidenceId: id,
+    outcome: "PASSED",
+    status: "VERIFIED",
+    reasons: [],
+    evidenceDigest,
+    arabicDifference: null,
+    corroboration,
+    attestation: { ...fields, signature: sign(fields, key) },
   };
 }
 
+/** A batch is fully verified only if it is non-empty and every record passed. */
+export function evaluateBatch(
+  items: ReadonlyArray<{ candidate: unknown; verification: unknown }>,
+  config: GateConfig,
+): BatchDecision {
+  const decisions = items.map((item) => evaluateEvidence(item.candidate, item.verification, config));
+  return {
+    fullyVerified: decisions.length > 0 && decisions.every((d) => d.outcome === "PASSED"),
+    decisions,
+  };
+}
+
+/**
+ * Downstream stages call this before using evidence. It proves the attestation
+ * was issued by the gate for exactly this candidate and verification record.
+ */
+export function verifyAttestation(
+  attestation: unknown,
+  candidateInput: unknown,
+  verificationInput: unknown,
+  attestationKey: string | undefined,
+): boolean {
+  if (!isUsableAttestationKey(attestationKey)) return false;
+  if (attestation === null || typeof attestation !== "object") return false;
+  const a = attestation as Partial<GateAttestation>;
+  if (
+    typeof a.gateVersion !== "string" ||
+    typeof a.registryVersion !== "string" ||
+    typeof a.evidenceId !== "string" ||
+    typeof a.evidenceDigest !== "string" ||
+    typeof a.issuedAt !== "string" ||
+    typeof a.signature !== "string"
+  ) {
+    return false;
+  }
+  const candidate = EvidenceCandidateSchema.safeParse(candidateInput);
+  const verification = VerificationRecordSchema.safeParse(verificationInput);
+  if (!candidate.success || !verification.success) return false;
+  if (a.gateVersion !== GATE_VERSION || a.evidenceId !== candidate.data.evidenceId) return false;
+  if (a.evidenceDigest !== digestEvidence(candidate.data, verification.data)) return false;
+
+  const expected = Buffer.from(
+    sign(
+      {
+        gateVersion: a.gateVersion,
+        registryVersion: a.registryVersion,
+        evidenceId: a.evidenceId,
+        evidenceDigest: a.evidenceDigest,
+        issuedAt: a.issuedAt,
+      },
+      attestationKey,
+    ),
+    "hex",
+  );
+  const actual = Buffer.from(a.signature, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+/** Signed summary of one gate run, so a partial batch cannot be relabelled as complete. */
+export interface BatchAttestation {
+  gateVersion: string;
+  runId: string;
+  totalRecords: number;
+  /** Evidence digests of the records that passed, sorted. */
+  passedDigests: string[];
+  fullyVerified: boolean;
+  issuedAt: string;
+  signature: string;
+}
+
+/** Returns null when nothing passed or the signing key is unusable. */
+export function attestBatch(runId: string, decisions: readonly GateDecision[], config: GateConfig): BatchAttestation | null {
+  const key = config.attestationKey;
+  const passedDigests = decisions
+    .filter((d) => d.outcome === "PASSED" && d.attestation)
+    .map((d) => d.attestation!.evidenceDigest)
+    .sort();
+  if (!isUsableAttestationKey(key) || passedDigests.length === 0) return null;
+  const fields = {
+    gateVersion: GATE_VERSION,
+    runId,
+    totalRecords: decisions.length,
+    passedDigests,
+    fullyVerified: passedDigests.length === decisions.length,
+    issuedAt: (config.now?.() ?? new Date()).toISOString(),
+  };
+  return { ...fields, signature: createHmac("sha256", key).update(canonicalJson(fields)).digest("hex") };
+}
+
+/** Checks the batch signature and that it covers exactly the given item digests. */
+export function verifyBatchAttestation(
+  batch: unknown,
+  itemDigests: readonly string[],
+  attestationKey: string | undefined,
+): batch is BatchAttestation {
+  if (!isUsableAttestationKey(attestationKey)) return false;
+  if (batch === null || typeof batch !== "object") return false;
+  const b = batch as Partial<BatchAttestation>;
+  if (
+    typeof b.gateVersion !== "string" ||
+    typeof b.runId !== "string" ||
+    typeof b.totalRecords !== "number" ||
+    !Array.isArray(b.passedDigests) ||
+    !b.passedDigests.every((d) => typeof d === "string") ||
+    typeof b.fullyVerified !== "boolean" ||
+    typeof b.issuedAt !== "string" ||
+    typeof b.signature !== "string"
+  ) {
+    return false;
+  }
+  if (b.gateVersion !== GATE_VERSION) return false;
+  const fields = {
+    gateVersion: b.gateVersion,
+    runId: b.runId,
+    totalRecords: b.totalRecords,
+    passedDigests: b.passedDigests,
+    fullyVerified: b.fullyVerified,
+    issuedAt: b.issuedAt,
+  };
+  const expected = Buffer.from(createHmac("sha256", attestationKey).update(canonicalJson(fields)).digest("hex"), "hex");
+  const actual = Buffer.from(b.signature, "hex");
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return false;
+  if (b.fullyVerified !== (b.passedDigests.length === b.totalRecords)) return false;
+  const given = [...itemDigests].sort();
+  return given.length === b.passedDigests.length && given.every((d, i) => d === b.passedDigests![i]);
+}
+
+/**
+ * Binds a script draft to the attested batch it was written from, so stages
+ * after the Script Agent can check that the script they are handed is the one
+ * produced from gate-attested evidence, unmodified.
+ */
+export interface ScriptAttestation {
+  gateVersion: string;
+  /** Signature of the batch attestation the script was drafted from. */
+  batchSignature: string;
+  /** SHA-256 of the exact script draft text. */
+  scriptDigest: string;
+  issuedAt: string;
+  signature: string;
+}
+
+export function digestText(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/** Returns null when the signing key is unusable or the draft is empty. */
+export function attestScript(scriptDraft: string, batch: BatchAttestation, config: GateConfig): ScriptAttestation | null {
+  const key = config.attestationKey;
+  if (!isUsableAttestationKey(key) || scriptDraft.trim() === "") return null;
+  const fields = {
+    gateVersion: GATE_VERSION,
+    batchSignature: batch.signature,
+    scriptDigest: digestText(scriptDraft),
+    issuedAt: (config.now?.() ?? new Date()).toISOString(),
+  };
+  return { ...fields, signature: createHmac("sha256", key).update(canonicalJson(fields)).digest("hex") };
+}
+
+export function verifyScriptAttestation(
+  attestation: unknown,
+  scriptDraft: string,
+  batch: BatchAttestation,
+  attestationKey: string | undefined,
+): attestation is ScriptAttestation {
+  if (!isUsableAttestationKey(attestationKey)) return false;
+  if (attestation === null || typeof attestation !== "object") return false;
+  const a = attestation as Partial<ScriptAttestation>;
+  if (
+    typeof a.gateVersion !== "string" ||
+    typeof a.batchSignature !== "string" ||
+    typeof a.scriptDigest !== "string" ||
+    typeof a.issuedAt !== "string" ||
+    typeof a.signature !== "string"
+  ) {
+    return false;
+  }
+  if (a.gateVersion !== GATE_VERSION || a.batchSignature !== batch.signature) return false;
+  if (a.scriptDigest !== digestText(scriptDraft)) return false;
+  const fields = {
+    gateVersion: a.gateVersion,
+    batchSignature: a.batchSignature,
+    scriptDigest: a.scriptDigest,
+    issuedAt: a.issuedAt,
+  };
+  const expected = Buffer.from(createHmac("sha256", attestationKey).update(canonicalJson(fields)).digest("hex"), "hex");
+  const actual = Buffer.from(a.signature, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}

@@ -12,10 +12,12 @@
 - [ ] End-to-end SSE run verification against live ADK server.
 
 ## Phase 2: Deterministic Religious Verification Gate (Completed)
-- [x] Created typed evidence models in `apps/agent/src/verification/types.ts`.
-- [x] Implemented deterministic gate logic in `apps/agent/src/verification/gate.ts`.
-- [x] Implemented 23 automated unit test cases covering all edge cases (`gate.test.ts`).
-- [x] Verified 23/23 tests pass cleanly.
+- [x] Evidence contracts in `apps/agent/src/verification/contracts.ts`.
+- [x] Gate with signed attestations, trusted-source registry and Arabic comparison in `apps/agent/src/verification/`.
+- [x] Gate enforced in the ADK workflows in `apps/agent/src/workflow/` (Script Agent and the five production agents).
+- [x] 61/61 gate and workflow tests pass with mock models.
+- [ ] Create the `HIDAYA_GATE_ATTESTATION_KEY` secret; without it the gate passes nothing.
+- [ ] Have the gate fetch cited passages from registered sources itself.
 
 ## Phase 3: Integration Adapters (In Progress)
 - [x] YouTube Data API v3 search and metadata client scaffolded.
@@ -43,3 +45,4 @@
 - [ ] Deploy `apps/api` and `apps/web` as unified `hidaya-one-dashboard` on Cloud Run.
 - [ ] Deploy headless `hidaya-one-agent-api`.
 - [ ] Apply least-privilege IAM and Cloud Run Invoker bindings.
+

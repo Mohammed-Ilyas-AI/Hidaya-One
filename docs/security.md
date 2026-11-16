@@ -17,10 +17,12 @@
 
 ## 4. Religious Safeguards as Software Invariants
 - Religious verification is enforced deterministically by code (`apps/agent/src/verification/gate.ts`).
-- An LLM asserting `status = "VERIFIED"` is untrusted until the 23-point software gate validates:
+- The gate signs an attestation for each passing record, and the workflows in `apps/agent/src/workflow/` re-verify it before the Script Agent and each production agent is called. Full design and limitations: `apps/agent/docs/SECURITY.md`.
+- An LLM asserting `status = "VERIFIED"` is untrusted until the software gate validates:
   1. Arabic source text presence and length.
   2. Surah (1–114) and Ayah boundary constraints.
   3. Hadith collection and number validity.
   4. Explicit named scholars on all authenticity grades.
   5. Source URL and timestamp integrity.
   6. Prevention of gate bypass flags (`gatePassed: true` cannot be pre-set by an agent).
+

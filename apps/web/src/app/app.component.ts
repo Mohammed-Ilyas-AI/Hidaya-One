@@ -74,3 +74,4 @@ export class AppComponent {
     { path: '/settings', label: 'Settings & Cloud', icon: '⚙️' },
   ];
 }
+

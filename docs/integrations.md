@@ -21,3 +21,4 @@ Integrations follow a strict truthful status protocol:
 | **YouTube Data API v3** | `googleapis` (API Key) | `CONNECTED` | Search and public statistics only |
 | **YouTube OAuth 2.0** | Google OAuth Client | `NOT_CONFIGURED` | Required for private staging and uploads |
 | **Instagram Graph API** | Meta Graph API | `NOT_CONFIGURED` | Requires Professional Account & Meta App verification |
+

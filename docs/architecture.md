@@ -41,6 +41,7 @@ Hidaya One is structured as an end-to-end, production-grade automated Islamic ed
    - 8 specialist agents (Research, Verification, Script, Creative, Veo, Editor, QC, Channel Manager)
    - 4 research & verification helper agents (Google Search & URL Context)
    - Deterministic verification software gate (`src/verification/gate.ts`)
+   - ADK workflows that enforce the gate (`src/workflow/`)
 
 2. **`apps/api/`**: 
    Backend-for-Frontend (BFF) built on Express 5, TypeScript, and Zod. Acts as the protective boundary between the web UI and agent/cloud services. Ensures:
@@ -53,3 +54,4 @@ Hidaya One is structured as an end-to-end, production-grade automated Islamic ed
 
 4. **`packages/contracts/`**: 
    Single source of truth for API schemas and data interchange (`openapi.yaml`).
+

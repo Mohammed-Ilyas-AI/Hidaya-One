@@ -36,3 +36,4 @@ export class QcComponent {
     { title: '6. Rights & Copyright', desc: 'Safe background ambience, verified public-domain or licensed visual assets.' },
   ];
 }
+

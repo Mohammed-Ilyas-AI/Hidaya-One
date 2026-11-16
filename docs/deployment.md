@@ -53,3 +53,4 @@ After execution, access the developer UI via:
 gcloud run services proxy hidaya-one-dev --region asia-south1 --project even-boulder-514217-d5
 ```
 And use Cloud Shell Web Preview on port 8080.
+
