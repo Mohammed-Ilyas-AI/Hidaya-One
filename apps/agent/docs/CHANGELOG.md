@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Live verification and first gated deployment (2026-11-17)
+
+#### Changed
+- `hidaya-one-dev`: added `GOOGLE_CLOUD_LOCATION=global`. The model returned
+  404 in `asia-south1`, so every request had been failing.
+
+#### Added
+- Secret `hidaya-gate-attestation-key` in Secret Manager.
+- Cloud Run service `hidaya-one-agent-api`: the gated code, API only, private.
+
+#### Tested
+- `hidaya-one-dev`: 12 of 13 agents responded in a stepped draft-mode run.
+- `hidaya-one-agent-api`: one verified-script run returned `SCRIPTS_DRAFTED`
+  with 3 attested records. Two identical requests took 268 s and 808 s.
+- Not tested live: the production workflow.
+
 ### Monorepo port
 
 #### Changed

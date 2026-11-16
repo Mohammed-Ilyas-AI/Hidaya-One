@@ -65,10 +65,11 @@ Invariants to keep when changing this code:
   `list_services` and `get_service` unless the owner approves a deployment.
 
 The backend and dashboard have not been run against the gated agent workflows,
-and no media or publishing integration is connected. The Cloud project has one
-Cloud Run service, `hidaya-one-dev`, running code from before the gate existed.
-It has no `HIDAYA_GATE_ATTESTATION_KEY` secret yet, so the gated code would
-pass nothing if deployed as-is.
+and no media or publishing integration is connected. The Cloud project has two
+private Cloud Run services in `asia-south1`: `hidaya-one-dev` (code from before
+the gate, with the dev UI, kept for rollback) and `hidaya-one-agent-api` (the
+gated code, API only). Both call `gemini-3.8-flash` at location `global`; it is
+not served in `asia-south1`.
 
 ## Rules that are never traded away
 
