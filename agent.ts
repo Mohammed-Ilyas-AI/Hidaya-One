@@ -1,8 +1,20 @@
 import {
+  AgentTool,
   LlmAgent,
   GOOGLE_SEARCH,
   URL_CONTEXT,
+  type BaseLlm,
 } from "@google/adk";
+import { isUsableAttestationKey, type GateConfig } from "./verification/gate.ts";
+import { DEFAULT_SOURCE_REGISTRY } from "./verification/source-registry.ts";
+import {
+  PIPELINE_TOOL_NAME,
+  buildVerifiedScriptPipeline,
+  consoleAuditSink,
+  createPipelineTool,
+  createScriptEntryGuard,
+  type AuditSink,
+} from "./workflow/verified-script-pipeline.ts";
 
 /**
  * HIDAYA ONE — ADK TypeScript port
@@ -13,6 +25,11 @@ import {
  *
  * External video, TTS, rendering, YouTube and Instagram tools are NOT
  * connected in this starter. Those agents produce specifications only.
+ *
+ * Research, verification and script drafting are wired as an ADK graph
+ * Workflow with a deterministic gate (see workflow/verified-script-pipeline.ts).
+ * The Orchestrator reaches them only through the pipeline tool; the Tamil
+ * Script Agent is not in the Orchestrator's agent tree.
  */
 
 const MODEL = process.env.HIDAYA_MODEL ?? "gemini-3.8-flash";
@@ -33,9 +50,108 @@ Do not claim an external action succeeded unless an actually connected tool
 returns a successful result.
 `;
 
+const RESEARCH_OUTPUT_FORMAT = `
+STRUCTURED OUTPUT (required by the verification pipeline)
+End your reply with one JSON object inside a json code block, with nothing after it.
+The object has one field, "candidates": an array with one entry per candidate.
+Each entry has these fields:
+- "topicTitle": a short topic name.
+- "reference": for Quran, an object with "kind" set to "QURAN", and numeric
+  "surah", "ayahStart" and "ayahEnd" (equal for a single ayah). For Hadith, an
+  object with "kind" set to "HADITH", and "collection" and "hadithNumber" as
+  text exactly as the source gives them.
+- "arabicText": the exact Arabic wording copied from the source page, with its
+  diacritics unchanged.
+- "sourceUrl": the https URL of the page the Arabic text was copied from.
+- "sourceEdition": the edition, script or variant, if the source states one.
+- "gradings": for Hadith, an array of objects with "grade", "scholar" (the named
+  scholar or grading authority) and, when the grade was read on another page,
+  "sourceUrl". Use an empty array for Quran.
+- "unverifiedSupporting": an optional object with any of "narrator",
+  "bookOrChapter", "englishTranslation", "translationSourceUrl", "contextNote".
+Omit any field you could not confirm; never guess it. Add no other fields.
+Do not include a status, verdict or approval field: application code, not
+you, decides what passes.
+`;
+
+const VERIFICATION_OUTPUT_FORMAT = `
+PIPELINE INPUT AND STRUCTURED OUTPUT
+Your input is a JSON list of items, each with an "evidenceId", a "reference"
+and the URL the researcher used. You are deliberately not shown the
+researcher's Arabic text or gradings: retrieve them yourself from the source.
+End your reply with one JSON object inside a json code block, with nothing after it.
+The object has one field, "records": an array with one entry per evidenceId.
+Each entry has these fields:
+- "evidenceId": copied exactly from your input.
+- "reference": the reference as you verified it, in the same shape as the input.
+- "arabicText": the exact Arabic wording you retrieved yourself, with its
+  diacritics unchanged.
+- "sourceUrl": the https URL of the page you retrieved it from.
+- "sourceEdition": the edition, script or variant, if the source states one.
+- "gradings": for Hadith, an array of objects with "grade", "scholar" and, when
+  read on another page, "sourceUrl". Use an empty array for Quran.
+- "status": exactly one of the seven statuses listed above.
+- "notes": what you compared and what you found.
+Add no other fields. Your status is an input to a deterministic gate in
+application code. It is not the final decision, and nothing you write can
+mark a record as passed.
+`;
+
+const SCRIPT_INPUT_NOTE = `
+PIPELINE INPUT
+Your input is an attested evidence package built by application code after the
+deterministic verification gate. It contains only records that passed the gate.
+Use only that evidence. Fields under "unverifiedSupporting" (including any
+English translation) were not checked by the gate: if you use one, label it as
+not yet verified. If the package says records were withheld, do not write about
+the withheld topics.
+`;
+
+const ORCHESTRATOR_PIPELINE_NOTE = `
+ENFORCED VERIFICATION PIPELINE
+Research, independent verification and Tamil script drafting run only through
+the ${PIPELINE_TOOL_NAME} tool. You cannot transfer to the Research,
+Verification or Tamil Script agents. The gate decision in the tool result is
+made by application code and is final: you cannot approve, re-label or
+re-submit a blocked or human-review record as verified. Do not write a script
+yourself, and do not ask another specialist to work on evidence the tool did
+not return as passed. Report blocked and human-review records with their reasons.
+`;
+
+export interface BuildOptions {
+  /** Model for every agent. Defaults to HIDAYA_MODEL or gemini-3.8-flash. */
+  model?: string | BaseLlm;
+  /** Per-agent model override, used by tests to inject mock models. */
+  modelFor?: (agentName: string) => string | BaseLlm | undefined;
+  /** Gate configuration provider. Defaults to the environment. */
+  getGateConfig?: () => GateConfig;
+  audit?: AuditSink;
+  createRunId?: () => string;
+}
+
+let warnedAboutKey = false;
+
+/** Reads the gate configuration from the environment. Never logs the key. */
+export function gateConfigFromEnv(): GateConfig {
+  const attestationKey = process.env.HIDAYA_GATE_ATTESTATION_KEY;
+  if (!isUsableAttestationKey(attestationKey) && !warnedAboutKey) {
+    warnedAboutKey = true;
+    console.warn(
+      "HIDAYA_GATE_ATTESTATION_KEY is missing or shorter than 32 characters. " +
+        "The verification gate will block all evidence and no script will be drafted.",
+    );
+  }
+  return { attestationKey, registry: DEFAULT_SOURCE_REGISTRY };
+}
+
+export function buildHidayaAgents(options: BuildOptions = {}) {
+const modelFor = (agentName: string) => options.modelFor?.(agentName) ?? options.model ?? MODEL;
+const getGateConfig = options.getGateConfig ?? gateConfigFromEnv;
+const audit = options.audit ?? consoleAuditSink;
+
 const researchGoogleSearchAgent = new LlmAgent({
   name: "research_google_search_agent",
-  model: MODEL,
+  model: modelFor("research_google_search_agent"),
   description: "Performs Google Search for primary Islamic references.",
   instruction: `
 You are the Google Search helper for the Hidaya One Research Agent.
@@ -49,7 +165,7 @@ ${COMMON_GUARDRAILS}`,
 
 const researchUrlContextAgent = new LlmAgent({
   name: "research_url_context_agent",
-  model: MODEL,
+  model: modelFor("research_url_context_agent"),
   description: "Reads provided primary-source URLs.",
   instruction: `
 You retrieve and inspect the content of URLs supplied by the Research Agent.
@@ -62,7 +178,7 @@ ${COMMON_GUARDRAILS}`,
 
 const verificationGoogleSearchAgent = new LlmAgent({
   name: "verification_google_search_agent",
-  model: MODEL,
+  model: modelFor("verification_google_search_agent"),
   description: "Searches independently for corroborating source evidence.",
   instruction: `
 Independently search for the exact Quran or Hadith reference and any
@@ -74,7 +190,7 @@ ${COMMON_GUARDRAILS}`,
 
 const verificationUrlContextAgent = new LlmAgent({
   name: "verification_url_context_agent",
-  model: MODEL,
+  model: modelFor("verification_url_context_agent"),
   description: "Reads primary-source pages for independent verification.",
   instruction: `
 Read supplied source URLs and compare exact Arabic wording, reference,
@@ -84,9 +200,9 @@ ${COMMON_GUARDRAILS}`,
   tools: [URL_CONTEXT],
 });
 
-export const researchAgent = new LlmAgent({
+const researchAgent = new LlmAgent({
   name: "islamic_research_agent",
-  model: MODEL,
+  model: modelFor("islamic_research_agent"),
   description: "Finds three distinct Islamic educational topic candidates with primary references.",
   instruction: `
 You are the Islamic Research Agent for Hidaya One.
@@ -114,13 +230,16 @@ Do not invent or guess missing fields. Use UNKNOWN or NEEDS_REVIEW.
 If no persistent topic history is connected, state that cross-day
 duplicate detection is unavailable.
 Return structured candidate records, not publish-ready scripts.
-${COMMON_GUARDRAILS}`,
-  subAgents: [researchGoogleSearchAgent, researchUrlContextAgent],
+${COMMON_GUARDRAILS}${RESEARCH_OUTPUT_FORMAT}`,
+  tools: [
+    new AgentTool({ agent: researchGoogleSearchAgent }),
+    new AgentTool({ agent: researchUrlContextAgent }),
+  ],
 });
 
-export const verificationAgent = new LlmAgent({
+const verificationAgent = new LlmAgent({
   name: "verification_agent",
-  model: MODEL,
+  model: modelFor("verification_agent"),
   description: "Independently verifies Quran and Hadith evidence and blocks unsupported material.",
   instruction: `
 You are the strict religious evidence reviewer for Hidaya One.
@@ -150,13 +269,16 @@ REFERENCE_MISMATCH, AUTHENTICITY_UNCONFIRMED, or REJECTED.
 
 Only VERIFIED items may proceed to script drafting.
 If evidence is incomplete, fail closed.
-${COMMON_GUARDRAILS}`,
-  subAgents: [verificationGoogleSearchAgent, verificationUrlContextAgent],
+${COMMON_GUARDRAILS}${VERIFICATION_OUTPUT_FORMAT}`,
+  tools: [
+    new AgentTool({ agent: verificationGoogleSearchAgent }),
+    new AgentTool({ agent: verificationUrlContextAgent }),
+  ],
 });
 
-export const scriptAgent = new LlmAgent({
+const scriptAgent = new LlmAgent({
   name: "tamil_script_agent",
-  model: MODEL,
+  model: modelFor("tamil_script_agent"),
   description: "Writes 30–45 second Tamil-first scripts with exact Arabic and English support.",
   instruction: `
 You are the Tamil Script Agent for Hidaya One.
@@ -175,12 +297,14 @@ Never turn an explanation into a direct religious quotation.
 Never add unsupported religious promises, rulings or claims.
 Do not synthesize Quran recitation.
 Return structured, source-linked drafts.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${SCRIPT_INPUT_NOTE}`,
+  // Runs before every model call this agent makes, however it was invoked.
+  beforeModelCallback: createScriptEntryGuard(getGateConfig, audit),
 });
 
-export const creativeProducer = new LlmAgent({
+const creativeProducer = new LlmAgent({
   name: "creative_producer",
-  model: MODEL,
+  model: modelFor("creative_producer"),
   description: "Creates Hidaya One 9:16 storyboards, visual prompts and publishing metadata.",
   instruction: `
 You are the Creative Producer for Hidaya One.
@@ -207,9 +331,9 @@ Do not claim that video rendering has happened.
 ${COMMON_GUARDRAILS}`,
 });
 
-export const veoVideoGenerator = new LlmAgent({
+const veoVideoGenerator = new LlmAgent({
   name: "hidaya_veo_video_generator",
-  model: MODEL,
+  model: modelFor("hidaya_veo_video_generator"),
   description: "Prepares Veo clip prompts and parameters; does not claim to generate video without a connected tool.",
   instruction: `
 You are the Veo Video Generation specialist.
@@ -230,9 +354,9 @@ Do not create Quranic or Hadith Arabic text inside generated visuals.
 ${COMMON_GUARDRAILS}`,
 });
 
-export const videoEditor = new LlmAgent({
+const videoEditor = new LlmAgent({
   name: "hidaya_video_editor",
-  model: MODEL,
+  model: modelFor("hidaya_video_editor"),
   description: "Creates complete video assembly briefs for a 30–45 second vertical Short.",
   instruction: `
 You are the Video Assembly and Editing specialist.
@@ -256,9 +380,9 @@ Never claim that a final MP4 exists without a successful renderer response.
 ${COMMON_GUARDRAILS}`,
 });
 
-export const qualityControlAgent = new LlmAgent({
+const qualityControlAgent = new LlmAgent({
   name: "quality_control_agent",
-  model: MODEL,
+  model: modelFor("quality_control_agent"),
   description: "Independently checks religious, language, copyright and video quality.",
   instruction: `
 You are an independent quality reviewer. Do not trust another agent's
@@ -278,9 +402,9 @@ Missing evidence must be NEEDS_HUMAN_REVIEW or FAIL, never PASS.
 ${COMMON_GUARDRAILS}`,
 });
 
-export const channelManager = new LlmAgent({
+const channelManager = new LlmAgent({
   name: "hidaya_channel_manager",
-  model: MODEL,
+  model: modelFor("hidaya_channel_manager"),
   description: "Prepares YouTube and Instagram publishing manifests and checks release prerequisites.",
   instruction: `
 You are the Hidaya One Channel Operations specialist.
@@ -301,9 +425,18 @@ Never request or store passwords or OTPs.
 ${COMMON_GUARDRAILS}`,
 });
 
-export const rootAgent = new LlmAgent({
+const pipeline = buildVerifiedScriptPipeline({
+  researchAgent,
+  verificationAgent,
+  scriptAgent,
+  getGateConfig,
+  audit,
+  createRunId: options.createRunId,
+});
+
+const rootAgent = new LlmAgent({
   name: "hidaya_ai_orchestrator",
-  model: MODEL,
+  model: modelFor("hidaya_ai_orchestrator"),
   description: "Coordinates Hidaya One's nine-agent Islamic content production team.",
   instruction: `
 You are the Hidaya One master orchestrator.
@@ -330,11 +463,11 @@ Return a human-readable production pack and structured JSON.
 For missing integrations, report the precise NOT_CONNECTED status.
 The current starter is DEVELOPMENT / DRAFT_ONLY.
 Never claim a video was rendered or published.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${ORCHESTRATOR_PIPELINE_NOTE}`,
+  // Research, verification and script drafting are deliberately NOT sub-agents:
+  // the only route to them is the gated pipeline tool.
+  tools: [createPipelineTool(pipeline)],
   subAgents: [
-    researchAgent,
-    verificationAgent,
-    scriptAgent,
     creativeProducer,
     veoVideoGenerator,
     videoEditor,
@@ -342,3 +475,35 @@ ${COMMON_GUARDRAILS}`,
     channelManager,
   ],
 });
+
+return {
+  rootAgent,
+  pipeline,
+  researchAgent,
+  verificationAgent,
+  scriptAgent,
+  creativeProducer,
+  veoVideoGenerator,
+  videoEditor,
+  qualityControlAgent,
+  channelManager,
+  helperAgents: [
+    researchGoogleSearchAgent,
+    researchUrlContextAgent,
+    verificationGoogleSearchAgent,
+    verificationUrlContextAgent,
+  ],
+};
+}
+
+const hidaya = buildHidayaAgents();
+
+export const researchAgent = hidaya.researchAgent;
+export const verificationAgent = hidaya.verificationAgent;
+export const scriptAgent = hidaya.scriptAgent;
+export const creativeProducer = hidaya.creativeProducer;
+export const veoVideoGenerator = hidaya.veoVideoGenerator;
+export const videoEditor = hidaya.videoEditor;
+export const qualityControlAgent = hidaya.qualityControlAgent;
+export const channelManager = hidaya.channelManager;
+export const rootAgent = hidaya.rootAgent;

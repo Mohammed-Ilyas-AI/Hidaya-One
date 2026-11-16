@@ -16,9 +16,14 @@ So the source contains 13 `LlmAgent` instances in total, while retaining the sam
 
 Configured in code:
 - Gemini 3.8 Flash model ID
-- ADK TypeScript agents and sub-agent delegation
-- Google Search helper agents
-- URL Context helper agents
+- ADK TypeScript agents
+- Google Search and URL Context helper agents, exposed to the Research and
+  Verification agents as agent tools
+- An ADK graph Workflow that enforces research → independent verification →
+  deterministic gate → script drafting (see `ARCHITECTURE.md`)
+
+None of this has been run against a live Gemini model from this repository
+yet; see `INTEGRATIONS.md`.
 
 Not connected yet:
 - Veo video generation API
@@ -54,10 +59,17 @@ npm --version
 npm install
 ```
 
-5. Copy `.env.example` to `.env`, then replace `YOUR_GOOGLE_CLOUD_PROJECT_ID` with your project ID. Do not commit `.env`.
+5. Copy `.env.example` to `.env`, uncomment the Vertex AI block and set your project ID. `GOOGLE_CLOUD_LOCATION` is the one region setting (intended: `asia-south1`). Do not commit `.env`.
 
 ```bash
 cp .env.example .env
+```
+
+   Set the gate signing key as well. Without it the verification gate blocks
+   everything and no script is drafted:
+
+```bash
+echo "HIDAYA_GATE_ATTESTATION_KEY=$(openssl rand -hex 32)" >> .env
 ```
 
 6. Authenticate with Google Cloud for Vertex AI:
@@ -92,19 +104,26 @@ Return a research report and state the missing evidence clearly.
 Do not generate videos or publish anything.
 ```
 
-## Important architecture note
+## Architecture note
 
-This initial TypeScript port uses ADK `LlmAgent` sub-agent delegation, matching the exported Agent Studio structure. LLM delegation is not a hard deterministic gate. Before production, we must implement an ADK 2 graph-based Workflow with explicit validation nodes and branches so a failed religious verification blocks all downstream production. ADK TypeScript 2.0 supports graph-based workflows; the old `SequentialAgent` templates are deprecated in TypeScript.
+Research, verification and script drafting run as an ADK graph `Workflow` with
+a deterministic gate in application code. The Orchestrator reaches them only
+through the `run_verified_script_pipeline` tool, and the Tamil Script Agent
+re-checks the gate's attestation before its model is called. The other five
+specialists are still coordinated by LLM delegation. Details and limitations:
+`ARCHITECTURE.md`.
+
+## Checks
+
+```bash
+npm run typecheck
+npm test
+```
+
+Tests use scripted model responses and make no Gemini calls.
 
 ## Next milestones
 
-1. Confirm this project runs in ADK Web.
-2. Verify Google Search and URL Context events.
-3. Add typed evidence records and deterministic religious validation.
-4. Add an ADK graph workflow with fail-closed branches.
-5. Connect Veo, TTS, storage and renderer through real backend tools.
-6. Connect YouTube OAuth; test with private uploads only.
-7. Add Meta Graph API only after Instagram Professional account authorization.
-8. Add Cloud Scheduler after an authenticated production endpoint exists.
+See `IMPLEMENTATION_PLAN.md`.
 
 Do not deploy publicly or enable publishing from this starter.

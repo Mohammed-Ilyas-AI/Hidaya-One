@@ -8,7 +8,7 @@
     "adk:web": "npx @google/adk-devtools web",
     "adk:run": "npx @google/adk-devtools run agent.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"verification/**/*.test.ts\""
+    "test": "node --test \"verification/**/*.test.ts\" \"workflow/**/*.test.ts\""
   },
   "dependencies": {
     "@google/adk": "^2.4.0",

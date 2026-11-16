@@ -921,11 +921,12 @@ section is not part of the owner's blueprint; update it as the code changes.
 
 | Blueprint area | Status in this repository |
 | --- | --- |
-| 13 ADK agent instances (§6) | Present in a single root-level `agent.ts` as `LlmAgent`s with sub-agent delegation |
-| Monorepo layout `apps/`, `packages/`, `infra/` (§5) | Not present; the repository is a flat single-package ADK starter |
-| Deterministic validation gate and attestation (§7) | Implemented and unit-tested in `verification/`; not yet wired into the agent flow, which still relies on LLM instructions |
-| Graph workflow with fail-closed branches (§3.2, §8) | Not present |
+| 13 ADK agent instances (§6) | Present in `agent.ts`, built by `buildHidayaAgents()`. The four helpers are agent tools of the Research and Verification agents |
+| Monorepo layout `apps/`, `packages/`, `infra/` (§5) | Not present; the repository is a flat single-package ADK project |
+| Deterministic validation gate and attestation (§7) | Implemented in `verification/` and enforced in the agent flow by `workflow/verified-script-pipeline.ts`. It compares two agent-reported retrievals; it does not yet fetch sources itself |
+| Graph workflow with fail-closed branches (§3.2, §8) | Implemented for stages 2–4 (research, verification, script) as an ADK `Workflow`. Stages 5–12 are still LLM delegation |
+| Human review queue (§7) | Items are routed and returned to the caller; there is no durable queue or review UI |
 | Backend API, job manager, persistence (§5.2, §10, §11) | Not present in this repository |
 | Angular dashboard (§5.3, §12) | Not present in this repository |
 | Veo, TTS, storage, renderer, YouTube, Instagram (§9) | Not connected; agents return `NOT_CONNECTED` statuses |
-| Region (§14) | `.env.example` suggests `us-central1`; the blueprint specifies `asia-south1` |
+| Region (§14) | `GOOGLE_CLOUD_LOCATION` is the single setting; `.env.example` documents `asia-south1`. Model availability there is unverified |

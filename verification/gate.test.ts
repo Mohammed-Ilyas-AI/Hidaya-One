@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { compareArabic } from "./arabic.ts";
 import { evaluateBatch, evaluateEvidence, verifyAttestation, type GateConfig } from "./gate.ts";
+import { DEFAULT_SOURCE_REGISTRY, checkSource, type SourceRegistry } from "./source-registry.ts";
 
 /**
  * All fixtures are synthetic placeholders, not religious content. The Arabic
@@ -8,9 +10,17 @@ import { evaluateBatch, evaluateEvidence, verifyAttestation, type GateConfig } f
  * grade and host names are obvious dummies.
  */
 const KEY = "test-only-attestation-key-0123456789abcdef";
+const TEST_REGISTRY: SourceRegistry = {
+  version: "test-1",
+  sources: [
+    { host: "source.example", roles: ["QURAN_TEXT", "HADITH_TEXT", "GRADING_EVIDENCE"] },
+    { host: "qurantext.example", roles: ["QURAN_TEXT"] },
+    { host: "secondary.example", roles: ["SECONDARY_SUPPORT"] },
+  ],
+};
 const config: GateConfig = {
   attestationKey: KEY,
-  trustedSourceHosts: ["source.example"],
+  registry: TEST_REGISTRY,
   now: () => new Date("2026-01-01T00:00:00.000Z"),
 };
 
@@ -99,9 +109,32 @@ test("non-Arabic text in the Arabic field is blocked", () => {
   assert.equal(d.status, "ARABIC_MISMATCH");
 });
 
-test("diacritics-only difference goes to human review", () => {
+test("diacritics-only difference goes to human review with both texts and the exact difference", () => {
   const d = evaluateEvidence(candidate(), verification({ arabicText: ARABIC_NO_MARKS }), config);
   assert.equal(d.outcome, "HUMAN_REVIEW");
+  assert.equal(d.status, "NEEDS_HUMAN_REVIEW");
+  assert.equal(d.attestation, null);
+  assert.ok(d.arabicDifference);
+  assert.equal(d.arabicDifference.kind, "DIACRITICS_ONLY");
+  assert.equal(d.arabicDifference.candidateArabicText, ARABIC);
+  assert.equal(d.arabicDifference.verificationArabicText, ARABIC_NO_MARKS);
+  // ARABIC carries fatha on the first letter and dammatan + shadda on the second.
+  assert.deepEqual(d.arabicDifference.diacriticDifferences, [
+    { position: 0, baseCharacter: "ن", candidateMarks: ["U+064E"], verificationMarks: [] },
+    { position: 1, baseCharacter: "ص", candidateMarks: ["U+064C", "U+0651"], verificationMarks: [] },
+  ]);
+});
+
+test("letter, word and word-order differences are not diacritics-only", () => {
+  assert.equal(compareArabic("نص تجريبي", "نص تجريبى").kind, "DIFFERENT"); // different final letter
+  assert.equal(compareArabic("نص تجريبي", "نص تجريبي فقط").kind, "DIFFERENT"); // extra word
+  assert.equal(compareArabic("نص تجريبي", "تجريبي نص").kind, "DIFFERENT"); // word order
+  assert.equal(compareArabic("اختبار", "ٱختبار").kind, "DIFFERENT"); // alef vs alef wasla
+  assert.equal(compareArabic("نَص", "نُص").kind, "DIACRITICS_ONLY");
+  assert.equal(compareArabic("نص  تجريبي", " نص تجريبي ").kind, "IDENTICAL");
+  const blockedDecision = evaluateEvidence(candidate(), verification({ arabicText: ARABIC_OTHER }), config);
+  assert.equal(blockedDecision.arabicDifference?.kind, "DIFFERENT");
+  assert.equal(blockedDecision.arabicDifference?.candidateArabicText, ARABIC);
 });
 
 test("whitespace and tatweel differences do not matter", () => {
@@ -160,6 +193,46 @@ test("source URL rules", () => {
   assert.equal(evaluateEvidence(candidate({ sourceUrl: "not a url" }), verification(), config).status, "SOURCE_NOT_FOUND");
   assert.equal(evaluateEvidence(candidate(), verification({ sourceUrl: "https://untrusted.example/x" }), config).outcome, "HUMAN_REVIEW");
   assert.equal(evaluateEvidence(candidate(), verification({ sourceUrl: "https://evilsource.example/x" }), config).outcome, "HUMAN_REVIEW");
+});
+
+test("a registered host used outside its role goes to human review", () => {
+  // Quran-text host offered as a Hadith source.
+  assert.equal(evaluateEvidence(candidate(), verification({ sourceUrl: "https://qurantext.example/x" }), config).outcome, "HUMAN_REVIEW");
+  // Secondary source offered as primary text.
+  assert.equal(evaluateEvidence(candidate({ sourceUrl: "https://secondary.example/x" }), verification(), config).outcome, "HUMAN_REVIEW");
+  // Grading read from a host not registered for grading evidence.
+  const gradings = [{ grade: "TEST-GRADE", scholar: "TEST-SCHOLAR", sourceUrl: "https://qurantext.example/g" }];
+  const d = evaluateEvidence(candidate(), verification({ gradings }), config);
+  assert.equal(d.outcome, "HUMAN_REVIEW");
+  assert.match(d.reasons.join(" "), /GRADING_EVIDENCE/);
+});
+
+test("default registry is pinned: four hosts, explicit roles, no silent expansion", () => {
+  assert.equal(DEFAULT_SOURCE_REGISTRY.version, "2026-11-16.1");
+  assert.deepEqual(
+    DEFAULT_SOURCE_REGISTRY.sources.map((s) => [s.host, [...s.roles]]),
+    [
+      ["quran.com", ["QURAN_TEXT"]],
+      ["tanzil.net", ["QURAN_TEXT"]],
+      ["sunnah.com", ["HADITH_TEXT", "GRADING_EVIDENCE"]],
+      ["dorar.net", ["HADITH_TEXT", "GRADING_EVIDENCE"]],
+    ],
+  );
+  assert.ok(Object.isFrozen(DEFAULT_SOURCE_REGISTRY) && Object.isFrozen(DEFAULT_SOURCE_REGISTRY.sources));
+  assert.equal(checkSource("https://www.quran.com/x", "QURAN_TEXT", DEFAULT_SOURCE_REGISTRY).result, "OK");
+  assert.equal(checkSource("https://quran.com/x", "HADITH_TEXT", DEFAULT_SOURCE_REGISTRY).result, "WRONG_ROLE");
+  assert.equal(checkSource("https://notquran.com/x", "QURAN_TEXT", DEFAULT_SOURCE_REGISTRY).result, "UNREGISTERED_HOST");
+  assert.equal(checkSource("https://quran.com.evil.example/x", "QURAN_TEXT", DEFAULT_SOURCE_REGISTRY).result, "UNREGISTERED_HOST");
+});
+
+test("decisions record versions, digest and corroboration for audit", () => {
+  const d = evaluateEvidence(candidate(), verification(), config);
+  assert.equal(d.registryVersion, "test-1");
+  assert.equal(d.attestation?.registryVersion, "test-1");
+  assert.match(d.evidenceDigest ?? "", /^[0-9a-f]{64}$/);
+  assert.equal(d.corroboration, "DIFFERENT_HOST");
+  const same = evaluateEvidence(candidate(), verification({ sourceUrl: "https://source.example/research/0000" }), config);
+  assert.equal(same.corroboration, "SAME_URL");
 });
 
 test("self-verification is blocked", () => {

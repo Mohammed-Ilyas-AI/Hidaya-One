@@ -13,14 +13,31 @@ designing or changing any component, and keep that status section current.
 
 A flat, single-package Google ADK TypeScript starter (Node.js 24, ESM):
 
-- `agent.ts` — all 13 `LlmAgent` instances (orchestrator, 8 specialists, 4
-  Google Search / URL Context helpers). `rootAgent` is the entry point.
+- `agent.ts` — `buildHidayaAgents()` creates all 13 `LlmAgent` instances
+  (orchestrator, 8 specialists, 4 Google Search / URL Context helpers) and
+  exports the default set. `rootAgent` is the entry point. Tests call the
+  builder with mock models.
+- `verification/` — evidence contracts, trusted-source registry, Arabic
+  comparison, and the deterministic gate with signed attestations.
+- `workflow/verified-script-pipeline.ts` — the ADK graph `Workflow` that
+  enforces research → verification → gate → script, the Script Agent's entry
+  guard, and the Orchestrator's `run_verified_script_pipeline` tool.
 - `npm run adk:web` — ADK dev UI (local only). `npm run adk:run` — one CLI run.
-- `verification/` — typed evidence contracts and the deterministic religious
-  validation gate (`evaluateEvidence`, `evaluateBatch`, `verifyAttestation`).
-  Pure code, unit-tested, **not yet wired into the agent flow**.
 - `npm run typecheck`, `npm test` (Node's built-in runner, runs `.ts` directly;
-  relative imports use `.ts` extensions).
+  relative imports use `.ts` extensions; no enums or parameter properties).
+
+Invariants to keep when changing this code:
+
+- The Research, Verification and Tamil Script agents are never sub-agents or
+  agent tools of the Orchestrator. The pipeline tool is the only route.
+- The Script Agent keeps its `beforeModelCallback` entry guard.
+- Hosts are added to `verification/source-registry.ts` only on the owner's
+  instruction, with a version bump and the pinning test updated.
+- Do not use ADK `NodeTool` (or `tools: [workflow]`) for a workflow whose
+  agents call tools: in ADK 2.4.0 their tool results are lost. Run the
+  workflow as the root of its own runner, as `runVerifiedScriptPipeline` does.
+- Agents run as workflow nodes cannot transfer to sub-agents; give them
+  `AgentTool`s instead.
 
 The monorepo (`apps/agent`, `apps/api`, `apps/web`, `packages/*`, `infra/`),
 backend, Angular dashboard and all media/publishing integrations in the
