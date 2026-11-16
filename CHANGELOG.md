@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Step 1 — Google ecosystem and free-resource audit (documents only)
+
+- Added `GOOGLE_ECOSYSTEM_AUDIT.md`, `FREE_TOOLS_MATRIX.md`,
+  `ACCOUNT_CONNECTION_CHECKLIST.md` and `HIDAYA_ONE_COST_OPTIMIZATION.md`.
+- No code, configuration, credential, billing or cloud-resource change.
+
 ### Milestone 2 — gate enforced in the workflow
 
 #### Added
