@@ -15,6 +15,14 @@ import {
   createScriptEntryGuard,
   type AuditSink,
 } from "./workflow/verified-script-pipeline.ts";
+import { InMemoryJobStore, type JobStore } from "./workflow/jobs.ts";
+import { NOT_CONNECTED_PROVIDERS, type Providers } from "./workflow/providers.ts";
+import {
+  PRODUCTION_TOOL_NAME,
+  buildProductionWorkflow,
+  createProductionEntryGuard,
+  createProductionTool,
+} from "./workflow/production-pipeline.ts";
 
 /**
  * HIDAYA ONE — ADK TypeScript port
@@ -28,8 +36,9 @@ import {
  *
  * Research, verification and script drafting are wired as an ADK graph
  * Workflow with a deterministic gate (see workflow/verified-script-pipeline.ts).
- * The Orchestrator reaches them only through the pipeline tool; the Tamil
- * Script Agent is not in the Orchestrator's agent tree.
+ * The five later specialists run as a second Workflow
+ * (workflow/production-pipeline.ts). The Orchestrator reaches every specialist
+ * only through its two workflow tools; it has no sub-agents.
  */
 
 const MODEL = process.env.HIDAYA_MODEL ?? "gemini-3.8-flash";
@@ -107,6 +116,29 @@ not yet verified. If the package says records were withheld, do not write about
 the withheld topics.
 `;
 
+const PRODUCTION_INPUT_NOTE = `
+PIPELINE INPUT
+Your input is built by application code. It contains the evidence that passed
+the deterministic verification gate, the script drafted from that evidence,
+and the outputs of earlier production stages under "priorOutputs". Work only
+from these. Do not add religious quotations, references, gradings or claims
+that are not in the attested evidence. Fields under "unverifiedSupporting"
+were not checked by the gate.
+`;
+
+const QC_OUTPUT_FORMAT = `
+STRUCTURED OUTPUT
+"priorOutputs.productionStatus" states whether a rendered video exists. If none
+exists you cannot pass video checks: report them as NEEDS_HUMAN_REVIEW.
+End your reply with one JSON object inside a json code block, with nothing after it.
+It has these fields:
+- "overall": exactly one of PASS, FAIL or NEEDS_HUMAN_REVIEW.
+- "checks": an array of objects with "name" and "verdict" (PASS, FAIL or
+  NEEDS_HUMAN_REVIEW), one per item in your review list.
+- "notes": what you inspected and found.
+Application code, not you, decides whether anything is publish-ready.
+`;
+
 const ORCHESTRATOR_PIPELINE_NOTE = `
 ENFORCED VERIFICATION PIPELINE
 Research, independent verification and Tamil script drafting run only through
@@ -116,6 +148,16 @@ made by application code and is final: you cannot approve, re-label or
 re-submit a blocked or human-review record as verified. Do not write a script
 yourself, and do not ask another specialist to work on evidence the tool did
 not return as passed. Report blocked and human-review records with their reasons.
+
+PRODUCTION WORKFLOW
+Use the ${PRODUCTION_TOOL_NAME} tool for a full production run. It runs the
+verification pipeline above and then the Creative Producer, Veo Video
+Generator, Video Editor, Quality Control Agent and Channel Manager in a fixed
+order, and returns a report built by application code. You cannot transfer to
+any specialist. You cannot approve a job or publish: the owner does both
+outside this conversation. Report the tool's result as it is, including every
+stage that is NOT_CONNECTED, BLOCKED or FAILED, and never state that a video
+exists or was published unless the report says so.
 `;
 
 export interface BuildOptions {
@@ -127,6 +169,10 @@ export interface BuildOptions {
   getGateConfig?: () => GateConfig;
   audit?: AuditSink;
   createRunId?: () => string;
+  /** Media and publishing adapters. Defaults to nothing connected. */
+  providers?: Providers;
+  /** Job tracking. Defaults to an in-memory store for this process. */
+  jobStore?: JobStore;
 }
 
 let warnedAboutKey = false;
@@ -148,6 +194,9 @@ export function buildHidayaAgents(options: BuildOptions = {}) {
 const modelFor = (agentName: string) => options.modelFor?.(agentName) ?? options.model ?? MODEL;
 const getGateConfig = options.getGateConfig ?? gateConfigFromEnv;
 const audit = options.audit ?? consoleAuditSink;
+const providers = options.providers ?? NOT_CONNECTED_PROVIDERS;
+const jobStore = options.jobStore ?? new InMemoryJobStore();
+const productionGuard = (agentName: string) => createProductionEntryGuard(getGateConfig, audit, agentName);
 
 const researchGoogleSearchAgent = new LlmAgent({
   name: "research_google_search_agent",
@@ -328,7 +377,8 @@ For each short provide:
 Never depict Allah or Prophet Muhammad ﷺ, or fabricate depictions of prophets.
 Never place generated Quran/Hadith text inside image-generation prompts.
 Do not claim that video rendering has happened.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${PRODUCTION_INPUT_NOTE}`,
+  beforeModelCallback: productionGuard("creative_producer"),
 });
 
 const veoVideoGenerator = new LlmAgent({
@@ -351,7 +401,8 @@ No Veo API tool is connected in this starter.
 Return VIDEO_GENERATION_TOOL_NOT_CONNECTED plus complete specifications.
 Never claim an MP4 or clip exists without a successful tool response.
 Do not create Quranic or Hadith Arabic text inside generated visuals.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${PRODUCTION_INPUT_NOTE}`,
+  beforeModelCallback: productionGuard("hidaya_veo_video_generator"),
 });
 
 const videoEditor = new LlmAgent({
@@ -377,7 +428,8 @@ render settings and validation checklist.
 No TTS or rendering endpoint is connected in this starter.
 Return RENDERER_NOT_CONNECTED and NOT_GENERATED statuses where relevant.
 Never claim that a final MP4 exists without a successful renderer response.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${PRODUCTION_INPUT_NOTE}`,
+  beforeModelCallback: productionGuard("hidaya_video_editor"),
 });
 
 const qualityControlAgent = new LlmAgent({
@@ -399,7 +451,8 @@ Return PASS, FAIL or NEEDS_HUMAN_REVIEW for:
 Any critical failure must set publish_ready=false.
 Do not override a failed Verification Agent result.
 Missing evidence must be NEEDS_HUMAN_REVIEW or FAIL, never PASS.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${PRODUCTION_INPUT_NOTE}${QC_OUTPUT_FORMAT}`,
+  beforeModelCallback: productionGuard("quality_control_agent"),
 });
 
 const channelManager = new LlmAgent({
@@ -422,7 +475,8 @@ No YouTube or Meta publishing tool is connected in this starter.
 Return CHANNEL_API_NOT_CONNECTED and a valid draft manifest.
 Never claim an upload or publication occurred without tool confirmation.
 Never request or store passwords or OTPs.
-${COMMON_GUARDRAILS}`,
+${COMMON_GUARDRAILS}${PRODUCTION_INPUT_NOTE}`,
+  beforeModelCallback: productionGuard("hidaya_channel_manager"),
 });
 
 const pipeline = buildVerifiedScriptPipeline({
@@ -433,6 +487,23 @@ const pipeline = buildVerifiedScriptPipeline({
   audit,
   createRunId: options.createRunId,
 });
+
+const productionSystem = {
+  scriptPipeline: pipeline,
+  deps: {
+    creativeProducer,
+    veoVideoGenerator,
+    videoEditor,
+    qualityControlAgent,
+    channelManager,
+    getGateConfig,
+    audit,
+    providers,
+    jobStore,
+  },
+  productionWorkflow: undefined as unknown as ReturnType<typeof buildProductionWorkflow>,
+};
+productionSystem.productionWorkflow = buildProductionWorkflow(productionSystem.deps);
 
 const rootAgent = new LlmAgent({
   name: "hidaya_ai_orchestrator",
@@ -464,21 +535,16 @@ For missing integrations, report the precise NOT_CONNECTED status.
 The current starter is DEVELOPMENT / DRAFT_ONLY.
 Never claim a video was rendered or published.
 ${COMMON_GUARDRAILS}${ORCHESTRATOR_PIPELINE_NOTE}`,
-  // Research, verification and script drafting are deliberately NOT sub-agents:
-  // the only route to them is the gated pipeline tool.
-  tools: [createPipelineTool(pipeline)],
-  subAgents: [
-    creativeProducer,
-    veoVideoGenerator,
-    videoEditor,
-    qualityControlAgent,
-    channelManager,
-  ],
+  // No sub-agents, by design: every specialist is reached only through one of
+  // these two workflow tools, whose gates and guards the model cannot bypass.
+  tools: [createPipelineTool(pipeline), createProductionTool(productionSystem)],
 });
 
 return {
   rootAgent,
   pipeline,
+  productionSystem,
+  jobStore,
   researchAgent,
   verificationAgent,
   scriptAgent,

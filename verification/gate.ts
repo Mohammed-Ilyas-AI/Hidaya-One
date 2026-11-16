@@ -436,3 +436,66 @@ export function verifyBatchAttestation(
   const given = [...itemDigests].sort();
   return given.length === b.passedDigests.length && given.every((d, i) => d === b.passedDigests![i]);
 }
+
+/**
+ * Binds a script draft to the attested batch it was written from, so stages
+ * after the Script Agent can check that the script they are handed is the one
+ * produced from gate-attested evidence, unmodified.
+ */
+export interface ScriptAttestation {
+  gateVersion: string;
+  /** Signature of the batch attestation the script was drafted from. */
+  batchSignature: string;
+  /** SHA-256 of the exact script draft text. */
+  scriptDigest: string;
+  issuedAt: string;
+  signature: string;
+}
+
+export function digestText(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/** Returns null when the signing key is unusable or the draft is empty. */
+export function attestScript(scriptDraft: string, batch: BatchAttestation, config: GateConfig): ScriptAttestation | null {
+  const key = config.attestationKey;
+  if (!isUsableAttestationKey(key) || scriptDraft.trim() === "") return null;
+  const fields = {
+    gateVersion: GATE_VERSION,
+    batchSignature: batch.signature,
+    scriptDigest: digestText(scriptDraft),
+    issuedAt: (config.now?.() ?? new Date()).toISOString(),
+  };
+  return { ...fields, signature: createHmac("sha256", key).update(canonicalJson(fields)).digest("hex") };
+}
+
+export function verifyScriptAttestation(
+  attestation: unknown,
+  scriptDraft: string,
+  batch: BatchAttestation,
+  attestationKey: string | undefined,
+): attestation is ScriptAttestation {
+  if (!isUsableAttestationKey(attestationKey)) return false;
+  if (attestation === null || typeof attestation !== "object") return false;
+  const a = attestation as Partial<ScriptAttestation>;
+  if (
+    typeof a.gateVersion !== "string" ||
+    typeof a.batchSignature !== "string" ||
+    typeof a.scriptDigest !== "string" ||
+    typeof a.issuedAt !== "string" ||
+    typeof a.signature !== "string"
+  ) {
+    return false;
+  }
+  if (a.gateVersion !== GATE_VERSION || a.batchSignature !== batch.signature) return false;
+  if (a.scriptDigest !== digestText(scriptDraft)) return false;
+  const fields = {
+    gateVersion: a.gateVersion,
+    batchSignature: a.batchSignature,
+    scriptDigest: a.scriptDigest,
+    issuedAt: a.issuedAt,
+  };
+  const expected = Buffer.from(createHmac("sha256", attestationKey).update(canonicalJson(fields)).digest("hex"), "hex");
+  const actual = Buffer.from(a.signature, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}

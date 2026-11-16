@@ -324,10 +324,9 @@ test("no alternate workflow path can invoke the Script Agent with unattested evi
   assert.ok(!reachable.has(system.scriptAgent));
   assert.ok(!reachable.has(system.researchAgent) && !reachable.has(system.verificationAgent));
   assert.equal(system.rootAgent.findAgent("tamil_script_agent"), undefined);
-  assert.deepEqual(
-    system.rootAgent.subAgents.map((a) => a.name),
-    ["creative_producer", "hidaya_veo_video_generator", "hidaya_video_editor", "quality_control_agent", "hidaya_channel_manager"],
-  );
+  // The Orchestrator has no sub-agents at all: only its two workflow tools.
+  assert.deepEqual(system.rootAgent.subAgents, []);
+  assert.deepEqual(reachable.size, 1);
   // In the workflow graph the only edge into the Script Agent is the gate's PROCEED route.
   const incoming = system.pipeline.workflow.graph!.edges.filter((e) => e.toNode === system.scriptAgent);
   assert.deepEqual(incoming.map((e) => [e.fromNode.name, e.route]), [["deterministic_gate", "PROCEED"]]);

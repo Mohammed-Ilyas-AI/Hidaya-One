@@ -2,6 +2,8 @@ import { BaseLlm, InMemoryRunner, type BaseAgent, type LlmRequest, type LlmRespo
 import { buildHidayaAgents } from "../agent.ts";
 import type { GateConfig } from "../verification/gate.ts";
 import type { SourceRegistry } from "../verification/source-registry.ts";
+import { InMemoryJobStore } from "./jobs.ts";
+import type { ProducedAsset, Providers } from "./providers.ts";
 import type { AuditEntry } from "./verified-script-pipeline.ts";
 
 /**
@@ -106,6 +108,57 @@ export interface SystemOptions {
   verification: Array<Record<string, unknown> | null> | ((items: any[]) => unknown[]);
   gate?: Partial<GateConfig>;
   orchestrator?: Responder;
+  /** Scripted replies for the five production agents, by agent name. */
+  responders?: Record<string, Responder>;
+  providers?: Providers;
+}
+
+export const PRODUCTION_AGENTS = [
+  "creative_producer",
+  "hidaya_veo_video_generator",
+  "hidaya_video_editor",
+  "quality_control_agent",
+  "hidaya_channel_manager",
+] as const;
+
+const DEFAULT_PRODUCTION_REPLIES: Record<string, Responder> = {
+  creative_producer: () => text("MOCK-CREATIVE-PLAN: three scenes, geometric motion backgrounds."),
+  hidaya_veo_video_generator: () => text("MOCK-CLIP-SPECS: scene 1 emerald geometric pattern, 9:16, 8 seconds."),
+  hidaya_video_editor: () => text("MOCK-EDIT-BRIEF: timeline, subtitle timings, render settings."),
+  quality_control_agent: () => jsonBlock({ overall: "PASS", checks: [{ name: "religious fidelity", verdict: "PASS" }], notes: "mock" }),
+  hidaya_channel_manager: () => text("MOCK-RELEASE-MANIFEST: draft title and description."),
+};
+
+/**
+ * Test doubles for media and publishing. `simulated` marks what they return;
+ * the default (true) can never be published. `simulated: false` exists only to
+ * exercise the publish control logic and still touches no real service.
+ */
+export function fakeProviders(options: { simulated?: boolean } = {}) {
+  const simulated = options.simulated ?? true;
+  const calls = { video: 0, narration: 0, renderer: 0, publisher: 0 };
+  const media = (name: "video" | "narration" | "renderer", kind: ProducedAsset["kind"]) => ({
+    name: `fake-${name}`,
+    connectionStatus: () => "CONNECTED" as const,
+    produce: async ({ idempotencyKey }: { idempotencyKey: string }) => {
+      calls[name]++;
+      return { status: "PRODUCED" as const, assets: [{ kind, uri: `fake://${idempotencyKey}`, simulated }] };
+    },
+  });
+  const providers: Providers = {
+    video: media("video", "VIDEO_CLIP"),
+    narration: media("narration", "NARRATION_AUDIO"),
+    renderer: media("renderer", "RENDERED_VIDEO"),
+    publisher: {
+      name: "fake-publisher",
+      connectionStatus: () => "CONNECTED",
+      publish: async ({ idempotencyKey }) => {
+        calls.publisher++;
+        return { status: "PUBLISHED", reference: `fake-publication:${idempotencyKey}`, simulated };
+      },
+    },
+  };
+  return { providers, calls };
 }
 
 /** Builds the real 13-agent system from agent.ts with scripted models. */
@@ -127,11 +180,15 @@ export function buildSystem(options: SystemOptions) {
   const script = new MockLlm("script", () => text("SCRIPT-DRAFT-FROM-MOCK"));
   const orchestrator = new MockLlm("orchestrator", options.orchestrator ?? (() => text("ORCHESTRATOR-DONE")));
   const other = new MockLlm("other", () => text("OTHER-AGENT-REPLY"));
+  const production = Object.fromEntries(
+    PRODUCTION_AGENTS.map((name) => [name, new MockLlm(name, options.responders?.[name] ?? DEFAULT_PRODUCTION_REPLIES[name])]),
+  ) as Record<(typeof PRODUCTION_AGENTS)[number], MockLlm>;
   const models: Record<string, MockLlm> = {
     islamic_research_agent: research,
     verification_agent: verification,
     tamil_script_agent: script,
     hidaya_ai_orchestrator: orchestrator,
+    ...production,
   };
   let run = 0;
   const system = buildHidayaAgents({
@@ -139,8 +196,10 @@ export function buildSystem(options: SystemOptions) {
     getGateConfig: () => gateConfig(options.gate),
     audit: { record: (entry) => audit.push(entry) },
     createRunId: () => `run${++run}`,
+    providers: options.providers,
+    jobStore: new InMemoryJobStore(),
   });
-  return { ...system, audit, models: { research, verification, script, orchestrator, other } };
+  return { ...system, audit, models: { research, verification, script, orchestrator, other, ...production } };
 }
 
 /** Runs any agent as the root of a fresh runner with one user message. */

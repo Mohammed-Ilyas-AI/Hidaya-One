@@ -63,7 +63,8 @@ export const AUDIT_STATE_KEY = "hidaya:gate_audit";
 
 export type AuditEntry =
   | { type: "GATE_DECISION"; runId: string; decision: Omit<GateDecision, "attestation"> & { attested: boolean } }
-  | { type: "SCRIPT_ENTRY"; accepted: boolean; reason: string; evidenceIds: string[]; at: string };
+  | { type: "SCRIPT_ENTRY"; accepted: boolean; reason: string; evidenceIds: string[]; at: string }
+  | { type: "PRODUCTION_ENTRY"; agent: string; accepted: boolean; reason: string; at: string };
 
 export interface AuditSink {
   record(entry: AuditEntry): void;
@@ -175,7 +176,7 @@ export function checkScriptPackage(input: unknown, attestationKey: string | unde
 }
 
 /** The only thing the Script Agent's model is shown. Contains no signatures. */
-function scriptAgentView(pkg: ScriptPackage) {
+export function scriptAgentView(pkg: ScriptPackage) {
   return {
     notice:
       "Attested evidence from the deterministic verification gate. Use only this evidence. " +
@@ -200,7 +201,7 @@ function scriptAgentView(pkg: ScriptPackage) {
   };
 }
 
-function lastUserText(request: LlmRequest): string | undefined {
+export function lastUserText(request: LlmRequest): string | undefined {
   for (let i = request.contents.length - 1; i >= 0; i--) {
     const content = request.contents[i];
     if (content.role !== "user") continue;
@@ -457,6 +458,10 @@ export interface PipelineResult {
    * re-verify. Null unless a draft was produced. Not shown to the Orchestrator.
    */
   attestedPackage: ScriptPackage | null;
+  /** When each agent or code node was first and last seen emitting, by name. */
+  timeline: Record<string, { firstEventAt: string; lastEventAt: string }>;
+  startedAt: string;
+  finishedAt: string;
   error?: string;
 }
 
@@ -464,7 +469,11 @@ export interface PipelineResult {
  * Runs the workflow as the root of its own ADK runner and session, so the
  * agents inside it see nothing of the caller's conversation.
  */
-export async function runVerifiedScriptPipeline(pipeline: VerifiedScriptPipeline, request: string): Promise<PipelineResult> {
+export async function runVerifiedScriptPipeline(
+  pipeline: VerifiedScriptPipeline,
+  request: string,
+  options: { abortSignal?: AbortSignal } = {},
+): Promise<PipelineResult> {
   const { deps, workflow } = pipeline;
   const runId = deps.createRunId?.() ?? `run-${randomUUID()}`;
   const appName = "hidaya_verified_script_pipeline";
@@ -474,13 +483,19 @@ export async function runVerifiedScriptPipeline(pipeline: VerifiedScriptPipeline
 
   let scriptText: string | null = null;
   let error: string | undefined;
+  const timeline: PipelineResult["timeline"] = {};
+  const startedAt = new Date().toISOString();
   try {
     for await (const event of runner.runAsync({
       userId,
       sessionId: session.id,
       newMessage: { role: "user", parts: [{ text: request }] },
       runConfig: createRunConfig({ maxLlmCalls: MAX_LLM_CALLS_PER_RUN }),
+      abortSignal: options.abortSignal,
     })) {
+      const seenAt = new Date().toISOString();
+      const author = event.author ?? "unknown";
+      timeline[author] = { firstEventAt: timeline[author]?.firstEventAt ?? seenAt, lastEventAt: seenAt };
       if (event.author === deps.scriptAgent.name && typeof event.output === "string") scriptText = event.output;
     }
   } catch (cause) {
@@ -509,6 +524,9 @@ export async function runVerifiedScriptPipeline(pipeline: VerifiedScriptPipeline
     stopped: (state[STATE.stopped] as ReviewQueueItem[] | undefined) ?? [],
     scriptDraft: drafted ? scriptText : null,
     attestedPackage: drafted ? ((state[STATE.scriptPackage] as ScriptPackage | null | undefined) ?? null) : null,
+    timeline,
+    startedAt,
+    finishedAt: new Date().toISOString(),
     ...(error ? { error } : {}),
   };
 }
@@ -531,7 +549,7 @@ export function createPipelineTool(pipeline: VerifiedScriptPipeline) {
         return { ...rest, attested: attestation !== null };
       };
       const stripItem = (item: ReviewQueueItem) => ({ ...item, decision: withoutSignatures(item.decision) });
-      const { attestedPackage: _notForTheModel, ...rest } = result;
+      const { attestedPackage: _notForTheModel, timeline: _timeline, ...rest } = result;
       const visible = {
         ...rest,
         decisions: result.decisions.map(withoutSignatures),
