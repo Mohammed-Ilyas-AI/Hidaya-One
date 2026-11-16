@@ -5,7 +5,9 @@ operation has succeeded and been recorded here with its date.
 
 | Integration | Status | Notes |
 | --- | --- | --- |
-| Gemini via ADK | NOT_CONFIGURED | No authenticated model call has been made from this repository. The ADK CLI loads `agent.ts` and stops at the missing credential |
+| Gemini via ADK | NOT_CONFIGURED here | No authenticated model call has been made from this repository. The deployed `hidaya-one-dev` service is configured with a Gemini API key from Secret Manager; whether its calls succeed is unknown |
+| `My Google` connector (Cloud Run) | CONNECTED, read tested 2026-11-16 | `list_services` and `get_service` succeeded against the project. Deploy tools not used. This is a development-time connector, not part of the runtime |
+| Cloud Run service `hidaya-one-dev` | VERIFIED to exist and be Ready | Runs pre-gate code. Not changed |
 | Google Search (ADK tool) | NOT_CONFIGURED | Declared on two helper agents; no verified call |
 | URL Context (ADK tool) | NOT_CONFIGURED | Declared on two helper agents; no verified call |
 | Image generation | NOT_CONFIGURED | No adapter |
@@ -30,4 +32,6 @@ directly in Vertex AI mode (`GOOGLE_GENAI_USE_ENTERPRISE=true`) and fails
 loudly if it is unset. The intended value is `asia-south1`. Whether the
 configured model is available there is unverified.
 
-No provider adapter layer exists yet.
+A provider adapter layer exists (`workflow/providers.ts`) for video,
+narration, rendering and publishing. It has no real implementations: every
+default reports `NOT_CONFIGURED`.

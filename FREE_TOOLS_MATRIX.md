@@ -12,6 +12,7 @@ the sources and explains the evidence levels.
 | `FREE_TIER_WITH_LIMITS` | Free up to a stated limit, charged beyond it |
 | `PAID_API` | No free API usage |
 | `UNKNOWN_REQUIRES_OWNER_CONFIRMATION` | Could not be verified in this audit |
+| `NOT_SUPPORTED_FOR_AUTOMATION` | Usable by a person in a browser, with no supported API. Shown alongside the cost class where both apply |
 
 Nothing is marked free because a website or playground opens. A tool that is
 free to use by hand but has no API is marked manual.
@@ -27,12 +28,12 @@ Planning volume: 3 Shorts a day, about 90 a month, 30–45 seconds each.
 | Tool | Hidaya One use | Subscription entitlement | Free quota | API | Region | Authentication | Paid when | Verified | Class | Recommendation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Gemini Developer API, Flash-Lite | Agents | None. Plan benefits stop at the AI Studio web page | Free tier exists; limits are per project, shown in AI Studio | Yes | Global service | API key | Beyond free limits, or on a billed project. Gemini 3.5 Flash-Lite: US$0.30 in, US$2.50 out per 1M tokens | Google | `FREE_TIER_WITH_LIMITS` | First choice for the first live test |
-| Gemini Developer API, Flash (configured: `gemini-3.8-flash`) | Agents | None | One reading: 5 requests a minute, 20 a day | Yes | Global service | API key | As above; paid price not confirmed | 3rd | `UNKNOWN_REQUIRES_OWNER_CONFIRMATION` | Read the real limit in AI Studio before relying on it |
+| Gemini Developer API, Flash (configured: `gemini-3.8-flash`) | Agents | None | One reading: 5 requests a minute, 20 a day | Yes | Global service | API key | As above; paid price not confirmed | 3rd | `UNKNOWN_REQUIRES_OWNER_CONFIRMATION` | This is what `hidaya-one-dev` is configured to use, through a key in Secret Manager. Read the real limit in AI Studio |
 | Gemini on Vertex AI | Agents in production | None | No free tier | Yes | Gemini 3.5 Flash listed for `asia-south1`; 3.8 Flash not confirmed | Service account, no key | Always | Google | `PAID_API` | Preferred for Cloud Run because it needs no API key. Decide after the project audit |
 | Google Search grounding | Research and verification helpers | None | Gemini 3 and newer: 5,000 requests a month shared, then US$14 per 1,000. Free-tier availability for current models not confirmed | Yes, model tool | — | Same as the model | Beyond the allowance | Google | `FREE_TIER_WITH_LIMITS` | Fits: a daily run needs far fewer than 5,000 a month |
 | URL Context | Reading source pages | None | Tool is free; page content is billed as input tokens | Yes, model tool | — | Same as the model | Token cost only | Google | `FREE_TIER_WITH_LIMITS` | Use as now |
-| Google AI Studio web page | Prompt testing by hand | Higher limits with AI Pro | Free with limits | No (it is a UI) | — | Google account | — | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | Manual prompt tuning only |
-| Gemini app | Manual drafting | Higher limits with AI Pro | Free with limits | No | — | Google account | — | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | Not part of the pipeline |
+| Google AI Studio web page | Prompt testing by hand | Higher limits with AI Pro | Free with limits | No (it is a UI) | — | Google account | — | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION`, `NOT_SUPPORTED_FOR_AUTOMATION` | Manual prompt tuning only |
+| Gemini app | Manual drafting | Higher limits with AI Pro | Free with limits | No | — | Google account | — | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION`, `NOT_SUPPORTED_FOR_AUTOMATION` | Not part of the pipeline |
 | NotebookLM | Manual research notes | Higher limits with AI Pro | Free with limits | Not verified | — | Google account | — | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | Optional manual aid |
 | Google Developer Program Cloud credit | Pays for API and Cloud usage | US$10 a month with AI Pro, must be claimed | — | — | — | Billing account | Reported US$5 prepayment needed for Gemini API use | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | The most valuable benefit. Claim only with the owner's approval |
 
@@ -52,10 +53,10 @@ Google offers no Quran or Hadith verification product.
 | Tool | Hidaya One use | Subscription entitlement | Free quota | API | Region | Authentication | Paid when | Verified | Class | Recommendation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nano Banana through the Gemini API | Scene images | None | None; free tier "not available" | Yes | — | API key or service account | Every image. About US$0.034 per 1K image reported | Google for "no free tier"; 3rd for the price | `PAID_API` | Avoid for routine use. Too costly at 5 images a Short |
-| Nano Banana in the Gemini app or Flow | Scene images made by hand | Higher limits with AI Pro; exact number not found | Free with limits | No | — | Google account | Extra credits are a purchase | 3rd | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | Build a reusable image library by hand |
+| Nano Banana in the Gemini app or Flow | Scene images made by hand | Higher limits with AI Pro; exact number not found | Free with limits | No | — | Google account | Extra credits are a purchase | 3rd | `INCLUDED_IN_EXISTING_SUBSCRIPTION`, `NOT_SUPPORTED_FOR_AUTOMATION` | Build a reusable image library by hand |
 | Code-drawn geometric backgrounds | Brand visuals | — | — | In-process | — | — | Never | No (not built) | `FREE` | Default visual source. No depiction risk, no cost |
 | Veo through the Gemini API or Vertex AI | Video clips | None | None; free tier "not available" | Yes | Not confirmed for `asia-south1` | API key or service account | Every second. Veo 3.1 Lite US$0.05/s at 720p; Fast US$0.10/s; Standard US$0.40/s | Google | `PAID_API` | Do not use. See cost file |
-| Google Flow | Hero clips made by hand | 1,000 credits a month with AI Pro | 50 credits a day reported for every account | **No public API** | — | Google account | Extra credits are a purchase | Google for 1,000; 3rd for the rest | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | Manual step only. About one Lite clip per Short if credit costs hold |
+| Google Flow | Hero clips made by hand | 1,000 credits a month with AI Pro | 50 credits a day reported for every account | **No public API** | — | Google account | Extra credits are a purchase | Google for 1,000; 3rd for the rest | `INCLUDED_IN_EXISTING_SUBSCRIPTION`, `NOT_SUPPORTED_FOR_AUTOMATION` | Manual step only. About one Lite clip per Short if credit costs hold |
 | Cloud Text-to-Speech, Chirp 3 HD | Tamil narration | None | 1 million characters a month, then US$30 per 1M | Yes | Mumbai availability conflicting | Service account | Beyond the allowance | Google | `FREE_TIER_WITH_LIMITS` | First choice. 14 female Tamil voices listed |
 | Cloud Text-to-Speech, WaveNet and Standard | Tamil narration fallback | None | Reported 1 million (WaveNet) and 4 million (Standard) characters a month | Yes | — | Service account | Beyond the allowance | Google | `FREE_TIER_WITH_LIMITS` | Fallback. Female voices `ta-IN-Wavenet-A`/`-C`, `ta-IN-Standard-A`/`-C` |
 | Gemini TTS through the Gemini API | Tamil narration alternative | None | Free tier listed for the preview model | Yes | — | API key | Paid tier: US$1 per 1M input tokens, US$20 per 1M audio output tokens | Google | `FREE_TIER_WITH_LIMITS` | Compare voice quality with Chirp 3 HD in a test |
@@ -71,6 +72,7 @@ Google offers no Quran or Hadith verification product.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Google ADK TypeScript | Agents and workflow | — | — | Library | — | — | Never | Repo (Apache-2.0) | `FREE` | Keep |
 | ADK dev UI and CLI | Debugging | — | — | Local | — | — | Never | Repo | `FREE` | Keep local only |
+| Google Cloud Workflows | Orchestration outside the agents | None | Not verified | Yes | — | Service account | Not verified | No | `UNKNOWN_REQUIRES_OWNER_CONFIRMATION` | Not needed: ADK `Workflow` already orchestrates in-process. Cloud Scheduler plus Cloud Run is enough for the daily trigger |
 | Vertex AI Agent Engine and session service | Hosted agent runtime | None | Not verified | Yes | — | Service account | Not verified | No | `UNKNOWN_REQUIRES_OWNER_CONFIRMATION` | Not needed. Cloud Run is enough |
 | Google Antigravity | Coding assistant | Higher limits with AI Pro | Free individual plan with weekly limits | No | — | Google account | Extra credits are a purchase | Google | `INCLUDED_IN_EXISTING_SUBSCRIPTION` | Optional. Claude Code stays the assistant |
 | Gemini CLI, Jules | Coding assistants | Not verified | Not verified | — | — | Google account | Not verified | No | `UNKNOWN_REQUIRES_OWNER_CONFIRMATION` | Optional |

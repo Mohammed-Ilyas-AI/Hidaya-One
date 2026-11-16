@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Milestone 3 — controlled production workflow and connector validation
+
+#### Added
+- `workflow/production-pipeline.ts`: a second ADK workflow running the Creative
+  Producer, Veo Video Generator, Video Editor, Quality Control Agent and
+  Channel Manager with code nodes between them.
+- Entry guards on all five production agents that re-verify gate attestations
+  and a new script attestation before the model is called.
+- `workflow/jobs.ts`: job and stage records, job statuses, idempotency keys,
+  an in-memory job store.
+- `workflow/providers.ts`: adapters for video, narration, rendering and
+  publishing, defaulting to not connected.
+- Owner approval and publish functions that no agent can call.
+- A code rule that fails a job when video prompts contain Arabic script.
+- `run_production_workflow` tool for the Orchestrator.
+- `GOOGLE_CONNECTOR_STATUS.md`, `HIDAYA_ONE_AGENT_INVENTORY.md`,
+  `AGENT_EXECUTION_REPORT.md`.
+
+#### Changed
+- The Orchestrator has no sub-agents; the five production agents are workflow
+  nodes. Their instructions gained a pipeline input section; QC gained an
+  output format.
+- The pipeline result records a timeline, and the pipeline accepts an abort
+  signal.
+
+#### Verified, not changed
+- The `My Google` connector works for Cloud Run reads. The Cloud project has
+  one service, `hidaya-one-dev`, running pre-gate code. Nothing was deployed.
+
 ### Step 1 — Google ecosystem and free-resource audit (documents only)
 
 - Added `GOOGLE_ECOSYSTEM_AUDIT.md`, `FREE_TOOLS_MATRIX.md`,

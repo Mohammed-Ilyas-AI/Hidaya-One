@@ -42,6 +42,13 @@ The session has an access-token environment variable set by the hosting
 environment, but Google rejects it, so it grants no access. Its value was not
 read or printed.
 
+**Update, same day:** a Claude connector named `My Google` was added. It can
+read Cloud Run services, and confirmed one service, `hidaya-one-dev`, Ready in
+`asia-south1`, using a Gemini API key from Secret Manager. It cannot read
+APIs, IAM, secrets, storage, Firestore or billing. See
+`GOOGLE_CONNECTOR_STATUS.md`. The gcloud findings in the table above are
+unchanged.
+
 Nothing in this section says the project is broken. It says this session has
 no way to look. `ACCOUNT_CONNECTION_CHECKLIST.md` gives a read-only script the
 owner can run in Cloud Shell to answer all eight questions without sharing a

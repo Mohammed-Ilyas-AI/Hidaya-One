@@ -44,7 +44,8 @@ Script Agent's model received and inspecting their content.
 Further workflow tests: the verifier is not shown the researcher's Arabic text;
 the Script Agent is shown attested evidence only; audit entries are recorded
 without secrets; missing, duplicated or unparseable verification output blocks;
-records over the per-run limit are blocked; all 13 agents exist.
+records over the per-run limit are blocked; all 13 agents exist; the four
+helper agents execute as tools of their parents.
 
 Test 15 covers the Script Agent run directly, wrapped as an agent tool, and
 reached by transfer from another agent, plus a structural check that it is not
@@ -53,6 +54,31 @@ in the Orchestrator's agent tree and has one incoming graph edge.
 The tests were checked by weakening the code: skipping the item attestation
 check, removing the entry guard, re-adding the Script Agent as an Orchestrator
 sub-agent, and skipping the batch attestation check each make tests fail.
+
+## Production workflow tests — `workflow/production.test.ts`
+
+The real 13 agents and both real workflows, with scripted models. Providers
+are either the real default (nothing connected) or labelled fakes whose assets
+are marked `simulated`.
+
+- End-to-end demonstration from topic to approval request, with every stage
+  record checked.
+- A failed gate stops the job before any production agent.
+- Production agents see attested evidence, the attested script and earlier
+  outputs only.
+- No production agent runs on a tampered, forged, missing or keyless package.
+- Arabic script in video prompts stops the job before any provider call.
+- QC `FAIL` halts; unparseable QC output is not a pass.
+- Simulated media can never be published.
+- Publishing needs owner approval and a real video, and happens once.
+- Rejection and revision requests end the job.
+- Duplicate starts and duplicate media generation are prevented.
+- Jobs can be cancelled, listed and inspected.
+- A model error fails the job visibly.
+- A mixed batch produces from passing records only.
+- The Orchestrator can neither approve nor publish.
+
+`AGENT_EXECUTION_REPORT.md` maps these to the demonstration steps.
 
 ## Not covered
 

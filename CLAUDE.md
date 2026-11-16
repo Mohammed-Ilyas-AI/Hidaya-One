@@ -19,18 +19,27 @@ A flat, single-package Google ADK TypeScript starter (Node.js 24, ESM):
   builder with mock models.
 - `verification/` — evidence contracts, trusted-source registry, Arabic
   comparison, and the deterministic gate with signed attestations.
-- `workflow/verified-script-pipeline.ts` — the ADK graph `Workflow` that
-  enforces research → verification → gate → script, the Script Agent's entry
-  guard, and the Orchestrator's `run_verified_script_pipeline` tool.
+- `workflow/verified-script-pipeline.ts` — workflow 1: research →
+  verification → gate → script, the Script Agent's entry guard, and the
+  `run_verified_script_pipeline` tool.
+- `workflow/production-pipeline.ts` — workflow 2: the five production agents
+  with entry guards, stage records, the QC gate, the approval request, and the
+  `run_production_workflow` tool. `workflow/jobs.ts` holds job records and the
+  in-memory store; `workflow/providers.ts` holds media and publishing adapters
+  (none connected).
 - `npm run adk:web` — ADK dev UI (local only). `npm run adk:run` — one CLI run.
 - `npm run typecheck`, `npm test` (Node's built-in runner, runs `.ts` directly;
   relative imports use `.ts` extensions; no enums or parameter properties).
 
 Invariants to keep when changing this code:
 
-- The Research, Verification and Tamil Script agents are never sub-agents or
-  agent tools of the Orchestrator. The pipeline tool is the only route.
-- The Script Agent keeps its `beforeModelCallback` entry guard.
+- The Orchestrator has no sub-agents. Every specialist is a workflow node,
+  reached only through the two workflow tools.
+- The Script Agent and the five production agents keep their
+  `beforeModelCallback` entry guards.
+- Approval and publishing are never exposed to an agent as a tool.
+- A provider adapter reports `CONNECTED` only when it is; assets from test
+  doubles are marked `simulated` and can never be published.
 - Hosts are added to `verification/source-registry.ts` only on the owner's
   instruction, with a version bump and the pinning test updated.
 - Do not use ADK `NodeTool` (or `tools: [workflow]`) for a workflow whose
@@ -38,10 +47,14 @@ Invariants to keep when changing this code:
   workflow as the root of its own runner, as `runVerifiedScriptPipeline` does.
 - Agents run as workflow nodes cannot transfer to sub-agents; give them
   `AgentTool`s instead.
+- A workflow may have only one terminal node that returns an output.
+- The `My Google` connector reads Cloud Run and can also deploy. Use only
+  `list_services` and `get_service` unless the owner approves a deployment.
 
 The monorepo (`apps/agent`, `apps/api`, `apps/web`, `packages/*`, `infra/`),
 backend, Angular dashboard and all media/publishing integrations in the
-blueprint are not in this repository yet.
+blueprint are not in this repository yet. The Cloud project has one Cloud Run
+service, `hidaya-one-dev`, running code from before the gate existed.
 
 ## Rules that are never traded away
 

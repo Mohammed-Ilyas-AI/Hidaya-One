@@ -470,3 +470,38 @@ test("all 13 agents are preserved and the production registry is the default", a
   const { gateConfigFromEnv } = await import("../agent.ts");
   assert.equal(gateConfigFromEnv().registry, DEFAULT_SOURCE_REGISTRY);
 });
+
+test("the four helper agents execute as tools of their parents and their results return to the parent", async () => {
+  const q = quranDraft();
+  const system = buildSystem({ research: [q], verification: [agreeing(q)] });
+  const helperNames = system.helperAgents.map((a) => a.name);
+  assert.deepEqual(helperNames, [
+    "research_google_search_agent",
+    "research_url_context_agent",
+    "verification_google_search_agent",
+    "verification_url_context_agent",
+  ]);
+  const finalResearch = (system.models.research as any).responder;
+  const finalVerification = (system.models.verification as any).responder;
+  (system.models.research as any).responder = (request: any, step: number) =>
+    step === 0
+      ? call("research_google_search_agent", { request: "find the source page" })
+      : step === 1
+        ? call("research_url_context_agent", { request: "read the source page" })
+        : finalResearch(request, step);
+  (system.models.verification as any).responder = (request: any, step: number) => {
+    if (step === 0) return call("verification_google_search_agent", { request: "find the source page" });
+    if (step === 1) return call("verification_url_context_agent", { request: "read the source page" });
+    // The verifier's input is its first user turn; later turns are tool results.
+    return finalVerification({ ...request, contents: [request.contents[0]] }, step);
+  };
+  const result = await runVerifiedScriptPipeline(system.pipeline, "daily batch");
+  assert.equal(result.status, "SCRIPTS_DRAFTED");
+  // All four helpers share the "other" mock model: one request each.
+  assert.equal(system.models.other.requests.length, 4);
+  // Each parent saw its helpers' replies come back as tool results.
+  for (const parent of [system.models.research, system.models.verification]) {
+    assert.equal(parent.requests.length, 3);
+    assert.equal(parent.seenText.split("OTHER-AGENT-REPLY").length - 1 >= 2, true);
+  }
+});

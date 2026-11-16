@@ -21,8 +21,14 @@ export class MockLlm extends BaseLlm {
   readonly requests: LlmRequest[] = [];
   private readonly responder: Responder;
 
-  constructor(name: string, responder: Responder) {
-    super({ model: `mock-${name}` });
+  /**
+   * `modelName` overrides the reported model ID. The helper agents' built-in
+   * Google Search and URL Context tools refuse any model whose name is not a
+   * Gemini model, so their mock reports one. It is still this class: no
+   * network call is made.
+   */
+  constructor(name: string, responder: Responder, modelName = `mock-${name}`) {
+    super({ model: modelName });
     this.responder = responder;
   }
 
@@ -179,7 +185,7 @@ export function buildSystem(options: SystemOptions) {
   });
   const script = new MockLlm("script", () => text("SCRIPT-DRAFT-FROM-MOCK"));
   const orchestrator = new MockLlm("orchestrator", options.orchestrator ?? (() => text("ORCHESTRATOR-DONE")));
-  const other = new MockLlm("other", () => text("OTHER-AGENT-REPLY"));
+  const other = new MockLlm("other", () => text("OTHER-AGENT-REPLY"), "gemini-3.8-flash");
   const production = Object.fromEntries(
     PRODUCTION_AGENTS.map((name) => [name, new MockLlm(name, options.responders?.[name] ?? DEFAULT_PRODUCTION_REPLIES[name])]),
   ) as Record<(typeof PRODUCTION_AGENTS)[number], MockLlm>;

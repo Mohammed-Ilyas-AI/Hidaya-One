@@ -924,7 +924,9 @@ section is not part of the owner's blueprint; update it as the code changes.
 | 13 ADK agent instances (§6) | Present in `agent.ts`, built by `buildHidayaAgents()`. The four helpers are agent tools of the Research and Verification agents |
 | Monorepo layout `apps/`, `packages/`, `infra/` (§5) | Not present; the repository is a flat single-package ADK project |
 | Deterministic validation gate and attestation (§7) | Implemented in `verification/` and enforced in the agent flow by `workflow/verified-script-pipeline.ts`. It compares two agent-reported retrievals; it does not yet fetch sources itself |
-| Graph workflow with fail-closed branches (§3.2, §8) | Implemented for stages 2–4 (research, verification, script) as an ADK `Workflow`. Stages 5–12 are still LLM delegation |
+| Graph workflow with fail-closed branches (§3.2, §8) | Implemented for every agent stage as two ADK `Workflow`s. Executed with mock models only; media stages record `NOT_CONNECTED` |
+| Job and stage tracking (§11) | Implemented with an in-memory store: statuses, stage records, idempotency, cancellation. Not durable |
+| Human approval before publishing (§3.4) | Enforced in code: no agent can approve or publish. No interface for the owner yet |
 | Human review queue (§7) | Items are routed and returned to the caller; there is no durable queue or review UI |
 | Backend API, job manager, persistence (§5.2, §10, §11) | Not present in this repository |
 | Angular dashboard (§5.3, §12) | Not present in this repository |

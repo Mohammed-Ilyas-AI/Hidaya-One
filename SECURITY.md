@@ -20,6 +20,19 @@ Target practices are in blueprint §13. This file records the current state.
   transfer from another agent.
 - The trusted-source list can only change through a reviewed code change.
 - A pipeline run is limited to 5 evidence records and 40 model calls.
+- **Attestation at every agent boundary.** The Script Agent and all five
+  production agents re-verify the gate attestations before their model is
+  called; the production agents also verify a script attestation, so an
+  altered script blocks them.
+- **No agent can approve or publish.** The approval and publish functions are
+  not tools. The Orchestrator has no sub-agents and only two workflow tools.
+- **Publishing conditions are checked in code:** owner approval by a named
+  person, QC pass, a real (not simulated) rendered video, a connected
+  publisher, and at most once per script.
+- Video generation prompts containing Arabic script fail the job before any
+  provider is called.
+- The `My Google` connector was used for two read tools only. Its three deploy
+  tools were not called.
 
 ## Limitations
 
@@ -27,6 +40,17 @@ Target practices are in blueprint §13. This file records the current state.
   attestations. There is no key ID, rotation procedure or expiry.
 - In Cloud Run the key must come from Secret Manager. That wiring does not
   exist yet; nothing has been deployed in this milestone.
+- **The deployed `hidaya-one-dev` service predates all of this.** It runs the
+  original starter, where verification is an LLM instruction, and it has no
+  gate signing key. Whether it is publicly reachable is unknown; port 8000
+  suggests the ADK development server, which must not be public.
+- The `My Google` connector can deploy, and can make a service public. Any use
+  of its deploy tools needs the owner's explicit approval.
+- An OAuth client secret for this project was pasted into a chat on
+  2026-11-16. It should be reset in the Cloud Console.
+- Depiction rules (no depiction of Allah, the Prophet ﷺ or other prophets) are
+  enforced by instructions, the QC Agent and the owner's review, not by code.
+- Jobs and approvals are held in memory; a restart loses a pending approval.
 - The gate trusts what the agents report they retrieved; see
   `ARCHITECTURE.md`, "Trust boundary and limitations".
 - Audit entries go to stdout and in-memory session state. They are not durable

@@ -15,21 +15,21 @@ verification/
   arabic.ts                           Arabic normalisation and diacritic comparison
   gate.ts                             Deterministic gate, item and batch attestations
 workflow/
-  verified-script-pipeline.ts         ADK Workflow, script entry guard, pipeline tool
-  test-support.ts                     Scripted mock model and synthetic fixtures
+  verified-script-pipeline.ts         Workflow 1, script entry guard, pipeline tool
+  production-pipeline.ts              Workflow 2, production entry guards, jobs, approval
+  jobs.ts                             Job and stage records, in-memory job store
+  providers.ts                        Media and publishing adapters (none connected)
+  test-support.ts                     Scripted mock model, fake providers, synthetic fixtures
 ```
 
 ## Agent structure
 
 ```text
-hidaya_ai_orchestrator (root LlmAgent)
-  sub-agents (LLM transfer):  creative_producer, hidaya_veo_video_generator,
-                              hidaya_video_editor, quality_control_agent,
-                              hidaya_channel_manager
-  tool:                       run_verified_script_pipeline
-                                |
-                                v
-verified_script_pipeline (ADK Workflow, own runner and session)
+hidaya_ai_orchestrator (root LlmAgent, no sub-agents)
+  tool: run_verified_script_pipeline ---> workflow 1 only
+  tool: run_production_workflow -------> workflow 1, then workflow 2
+
+Workflow 1: verified_script_pipeline (own runner and session)
   START
    -> islamic_research_agent          tools: research search + URL helpers
    -> collect_candidates              code
@@ -39,19 +39,33 @@ verified_script_pipeline (ADK Workflow, own runner and session)
         PROCEED      -> tamil_script_agent        entry guard, then model
         HUMAN_REVIEW -> human_review_queue        code
         STOP         -> stop_workflow             code
+
+Workflow 2: production_workflow (own runner and session)
+  START
+   -> production_intake               code: re-verify the production package
+   -> creative_producer               entry guard, then model
+   -> record_creative_plan            code
+   -> hidaya_veo_video_generator      entry guard, then model
+   -> asset_production                code: prompt rule, video provider
+   -> hidaya_video_editor             entry guard, then model
+   -> assembly                        code: narration provider, renderer
+   -> quality_control_agent           entry guard, then model
+   -> qc_gate                         code: decides publish readiness
+   -> hidaya_channel_manager          entry guard, then model
+   -> approval_gate                   code: requests owner approval
+  Any code node can route to production_halt instead.
 ```
 
-All 13 agents and their original instructions are kept. Three things changed
-in how they are wired:
+All 13 agents and their original instructions are kept. What changed in how
+they are wired:
 
-- The Research, Verification and Tamil Script agents are no longer sub-agents
-  of the Orchestrator. They are nodes of the workflow.
+- No agent is a sub-agent of the Orchestrator. All eight specialists are
+  workflow nodes, reached only through the Orchestrator's two tools.
 - The four helper agents are `AgentTool`s of their parent instead of
   sub-agents. An agent run as a workflow node cannot transfer to a sub-agent
   (ADK rejects the transfer), and as tools their results return to the parent.
-- Instructions gained a section each: the output format for research and
-  verification, the input description for the Script Agent, and the pipeline
-  rule for the Orchestrator.
+- Instructions gained a section each describing the pipeline input or output;
+  the original text is unchanged.
 
 ## ADK mechanisms used
 
@@ -185,6 +199,88 @@ The default sink writes one JSON line to stdout, which Cloud Logging collects.
 The pipeline tool also appends each run's decisions to the Orchestrator's
 session state under `hidaya:gate_audit`, and returns them in its result.
 
+## Production workflow
+
+`startProduction` runs one job: workflow 1, then, only if a script was drafted
+from attested evidence, workflow 2.
+
+### Attestation at every agent boundary
+
+After the Script Agent returns, code signs a **script attestation**: an HMAC
+over the SHA-256 of the exact draft and the signature of the batch attestation
+it was drafted from. Evidence, batch attestation, draft and script attestation
+together form the production package.
+
+Each of the five production agents has a `beforeModelCallback` entry guard. It
+re-verifies every item attestation, the batch attestation and the script
+attestation. If any check fails, the model is not called and the agent returns
+`PRODUCTION_STAGE_BLOCKED`. If they pass, the request is rewritten to the
+attested evidence, the attested script and the earlier stage outputs, with no
+signatures. Changing one character of the script, or any evidence field,
+blocks every later agent.
+
+### Stage records
+
+Each stage writes a record: stage, actor, status, start and finish time, what
+it received, its output, and any error. Statuses used: `COMPLETED`, `PASSED`,
+`PARTIAL`, `BLOCKED`, `FAILED`, `SKIPPED`, `NOT_CONNECTED`, `SIMULATED`,
+`REQUESTED`, `DISABLED`. For workflow 1 the times are when each node was first
+and last seen emitting, which is close to but not exactly its run time.
+
+### Code checks between agents
+
+| Node | Check |
+| --- | --- |
+| `production_intake` | The production package verifies |
+| every `record_*` node | The agent returned output and was not blocked |
+| `asset_production` | No Arabic script in the clip specifications, which are generation prompts. A violation fails the job before any provider is called |
+| `assembly` | Narration and rendering are attempted only through a connected provider, and rendering only if clips and narration exist |
+| `qc_gate` | Publish-ready only if QC returned `PASS` in the required format **and** a rendered video exists **and** it is not simulated. `FAIL` halts the job. Unparseable QC output is treated as needing human review |
+| `approval_gate` | Records an approval request. It never publishes |
+
+### Jobs
+
+`workflow/jobs.ts` defines the job record (ID, workflow, request, status,
+outcome, current stage, progress, times, error, stage records, approval,
+assets) and a `JobStore` interface. Job statuses: `CREATED`, `RUNNING`,
+`WAITING_FOR_APPROVAL`, `COMPLETED`, `FAILED`, `CANCELLED`.
+
+- **Start:** `startProduction`. A `requestKey` makes the start idempotent: a
+  second start with the same key returns the first job and runs nothing.
+- **Stop:** an `AbortSignal` cancels a job; agents after the cancellation
+  point do not run.
+- **Track:** `jobStore.get` and `jobStore.list`, optionally by status.
+- **Idempotency:** media generation, narration, rendering and publishing each
+  run at most once per key derived from the script digest. A second job for
+  the same script reuses the stored result.
+- **Retries:** nothing retries automatically. A failed stage fails the job.
+  `STAGE_RETRY_POLICY` records, per stage, whether a re-run is side-effect free
+  or deduplicated by key.
+
+The only store is `InMemoryJobStore`. Jobs are lost when the process ends.
+
+### Providers
+
+`workflow/providers.ts` defines adapters for video, narration, rendering and
+publishing. The defaults report `NOT_CONFIGURED` and refuse to act, so stages
+are recorded as `NOT_CONNECTED`. An asset carries a `simulated` flag; test
+doubles set it, and a simulated asset can never make a job publish-ready.
+
+### Approval and publishing
+
+`recordApprovalDecision` records the owner's decision and requires a named
+decider. `publishApprovedJob` publishes only when the owner approved, the job
+is publish-ready, a real rendered video exists, and the publisher is
+connected; it publishes once per script. Neither function is exposed to any
+agent as a tool, so no model can approve or publish. There is no screen for
+the owner to call them from yet.
+
+### The Orchestrator
+
+It accepts the request, chooses between its two tools, and reports. Its tools
+return reports built by code from recorded state. It has no sub-agents, no
+approval tool and no publishing tool, and tool results contain no signatures.
+
 ## Trust boundary and limitations
 
 What is enforced by code: a script draft can only come from the Script Agent,
@@ -203,16 +299,20 @@ What is not:
    the same model family using the same search service, and the verifier is
    given the researcher's URL. Each decision records whether the two source
    URLs were the same URL, the same host or different hosts.
-3. **The Orchestrator is still an LLM.** It cannot invoke the Script Agent or
-   alter a gate decision, but it can write text of its own. The five
-   downstream specialists are told to use only approved script packages; that
-   is an instruction, not yet a check.
+3. **The Orchestrator is still an LLM.** It cannot invoke any specialist
+   outside the workflows, alter a gate decision, approve or publish. It can
+   still write text of its own in its reply to the user.
+3a. **Downstream outputs are not themselves verified.** The production agents
+   can only start from attested evidence and the attested script, but what
+   they then write (storyboard, captions, titles) is model output. Code checks
+   only that video prompts contain no Arabic script. Depiction rules and
+   caption accuracy rely on the QC Agent and the owner's review.
 4. **Translation, narrator and context are not verified.** They are carried
    under `unverifiedSupporting`, covered by the attestation so they cannot be
    altered, and labelled as unchecked to the Script Agent.
-5. **Nothing is durable.** The human review list and audit trail live in the
-   tool result, in-memory session state and stdout logs. There is no review
-   queue storage or review screen.
+5. **Nothing is durable.** Jobs, approvals, the human review list and the audit
+   trail live in memory, tool results and stdout logs. There is no persistent
+   store and no review or approval screen.
 6. **Symmetric key.** Anything holding the key can mint attestations. There is
    no key ID, rotation or expiry; an attested package stays valid.
 7. **Not run against a live model.** Whether Gemini reliably produces the
