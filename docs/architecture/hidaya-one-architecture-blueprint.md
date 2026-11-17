@@ -931,4 +931,5 @@ section is not part of the owner's blueprint; update it as the code changes.
 | Backend API, job manager, persistence (§5.2, §10, §11) | Express API present in `apps/api`; not yet run against the gated agent workflows. No durable job manager or persistence (Firestore API is not enabled in the project) |
 | Angular dashboard (§5.3, §12) | Ten page components present in `apps/web`; not yet verified against live backend data |
 | Veo, TTS, storage, renderer, YouTube, Instagram (§9) | Not connected; agents return `NOT_CONNECTED` statuses |
-| Region (§14) | `GOOGLE_CLOUD_LOCATION` is the single setting; `apps/agent/.env.example` documents `asia-south1`. Model availability there is unverified |
+| Region (§14) | Cloud Run in `asia-south1`; the model is called at `GOOGLE_CLOUD_LOCATION=global`, because `gemini-3.8-flash` is not served in `asia-south1` (tested 2026-11-17) |
+| Model-call bounds and cost tracking (§16, §17) | Every model call has a per-attempt deadline (`HIDAYA_MODEL_TIMEOUT_MS`, default 180 s) and one telemetry log line with latency and tokens (`apps/agent/src/workflow/telemetry.ts`). Not yet deployed. No metrics dashboard or alerting |

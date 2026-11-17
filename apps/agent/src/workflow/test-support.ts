@@ -5,6 +5,7 @@ import type { SourceRegistry } from "../verification/source-registry.ts";
 import { InMemoryJobStore } from "./jobs.ts";
 import type { ProducedAsset, Providers } from "./providers.ts";
 import type { AuditEntry } from "./verified-script-pipeline.ts";
+import type { TelemetryEntry } from "./telemetry.ts";
 
 /**
  * Test support: scripted model responses, so workflow tests are deterministic
@@ -170,6 +171,7 @@ export function fakeProviders(options: { simulated?: boolean } = {}) {
 /** Builds the real 13-agent system from agent.ts with scripted models. */
 export function buildSystem(options: SystemOptions) {
   const audit: AuditEntry[] = [];
+  const telemetry: TelemetryEntry[] = [];
   const research = new MockLlm("research", () => jsonBlock({ candidates: options.research }));
   const verification = new MockLlm("verification", (request) => {
     const items: any[] = lastUserJson(request).items;
@@ -201,11 +203,12 @@ export function buildSystem(options: SystemOptions) {
     modelFor: (name) => models[name] ?? other,
     getGateConfig: () => gateConfig(options.gate),
     audit: { record: (entry) => audit.push(entry) },
+    telemetry: { record: (entry) => telemetry.push(entry) },
     createRunId: () => `run${++run}`,
     providers: options.providers,
     jobStore: new InMemoryJobStore(),
   });
-  return { ...system, audit, models: { research, verification, script, orchestrator, other, ...production } };
+  return { ...system, audit, telemetry, models: { research, verification, script, orchestrator, other, ...production } };
 }
 
 /** Runs any agent as the root of a fresh runner with one user message. */

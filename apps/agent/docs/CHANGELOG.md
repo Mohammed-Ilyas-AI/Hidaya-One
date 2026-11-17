@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Model-call deadline and telemetry (2026-11-17)
+
+#### Investigated
+- The 808 s run on `hidaya-one-agent-api` (2026-11-16 19:26:50 UTC): one
+  model call sent at 19:27:03 got no answer until Vertex AI returned 504 at the
+  10-minute server limit. Without it the run took ~210 s, like the 268 s run.
+  The SDK sets no client timeout and ADK passes no retry options, so the call
+  simply waited; ADK turned the 504 into an error event and the run continued
+  with less evidence (1 record, sent to human review) and no log line.
+- Several calls in those runs sent 50K–75K input tokens.
+
+#### Added
+- `src/workflow/telemetry.ts`: `ObservedModel` wraps every agent's model with a
+  per-attempt deadline (`HIDAYA_MODEL_TIMEOUT_MS`, default 180 s) and one
+  `hidaya_telemetry` log line per call (agent, run ID, outcome, latency,
+  tokens). Both pipelines log run start and end; model calls inside a run
+  carry its run ID. No automatic retries.
+- `src/workflow/telemetry.test.ts`: 9 tests. `npm test`: 70 of 70 pass.
+
+#### Not done
+- Not deployed. `hidaya-one-agent-api` still runs without the deadline.
+
 ### Live verification and first gated deployment (2026-11-17)
 
 #### Changed

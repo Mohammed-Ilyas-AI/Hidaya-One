@@ -10,6 +10,7 @@ import {
   type LlmResponse,
 } from "@google/adk";
 import { z } from "zod";
+import { withRunId, type TelemetrySink } from "./telemetry.ts";
 import { attestScript, digestText, verifyScriptAttestation, type GateConfig, type GateDecision } from "../verification/gate.ts";
 import { STAGES, STAGE_RETRY_POLICY, type ApprovalRecord, type Job, type JobStore, type Stage, type StageRecord, type StageStatus } from "./jobs.ts";
 import type { ProducedAsset, Providers } from "./providers.ts";
@@ -154,6 +155,8 @@ export interface ProductionDeps {
   channelManager: LlmAgent;
   getGateConfig: () => GateConfig;
   audit: AuditSink;
+  /** Run start/end lines. Model calls inside the job are tagged with its jobId. */
+  telemetry?: TelemetrySink;
   providers: Providers;
   jobStore: JobStore;
 }
@@ -428,13 +431,33 @@ function finish(store: JobStore, job: Job, status: Job["status"], outcome: strin
 }
 
 /** Runs one production job: the verified script pipeline, then the production workflow. */
-export async function startProduction(system: ProductionSystem, options: StartOptions): Promise<{ job: Job; reusedExistingJob: boolean; decisions: GateDecision[] }> {
+type StartResult = { job: Job; reusedExistingJob: boolean; decisions: GateDecision[] };
+
+export async function startProduction(system: ProductionSystem, options: StartOptions): Promise<StartResult> {
   const store = system.deps.jobStore;
   if (options.requestKey) {
     const existing = store.findByRequestKey(options.requestKey);
     if (existing) return { job: existing, reusedExistingJob: true, decisions: [] };
   }
   const job = store.create({ request: options.request, requestKey: options.requestKey ?? null, workflowId: "hidaya_production_v1", now: iso() });
+  const telemetry = system.deps.telemetry;
+  const started = Date.now();
+  telemetry?.record({ type: "PIPELINE_RUN", pipeline: "production", runId: job.jobId, phase: "START" });
+  const result = await withRunId(job.jobId, () => runProductionJob(system, job, options));
+  telemetry?.record({
+    type: "PIPELINE_RUN",
+    pipeline: "production",
+    runId: job.jobId,
+    phase: "END",
+    status: result.job.status,
+    durationMs: Date.now() - started,
+    ...(result.job.status === "FAILED" ? { error: result.job.outcome ?? "FAILED" } : {}),
+  });
+  return result;
+}
+
+async function runProductionJob(system: ProductionSystem, job: Job, options: StartOptions): Promise<StartResult> {
+  const store = system.deps.jobStore;
   if (options.abortSignal?.aborted) return { job: finish(store, job, "CANCELLED", "CANCELLED_BEFORE_START"), reusedExistingJob: false, decisions: [] };
   job.status = "RUNNING";
   store.save(job);

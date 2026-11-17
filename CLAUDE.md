@@ -39,6 +39,9 @@ Inside `apps/agent/`:
   and the `run_production_workflow` tool. `src/workflow/jobs.ts` holds job
   records and the in-memory store; `src/workflow/providers.ts` holds media and
   publishing adapters (none connected).
+- `src/workflow/telemetry.ts` — `ObservedModel` wraps every agent's model with
+  a per-call deadline (`HIDAYA_MODEL_TIMEOUT_MS`, default 180 s) and one
+  `hidaya_telemetry` log line per call (latency, tokens, outcome, run ID).
 - `npm run adk:web` — ADK dev UI (local only). `npm run adk:run` — one CLI run.
 - `npm run typecheck`, `npm test` (type-check, then Node's built-in runner,
   which runs `.ts` directly; relative imports use `.ts` extensions; no enums or

@@ -4,7 +4,7 @@ Phases follow blueprint §18. Status reflects this repository only.
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| 1 Agent Foundation | Verify the 13 agents, tool calls, auth, deterministic verification | In progress: no live model run yet |
+| 1 Agent Foundation | Verify the 13 agents, tool calls, auth, deterministic verification | In progress: two live verified-script runs; production workflow not run live |
 | 2 Workflow Intelligence | Graph workflow with fail-closed gate branches | Done for all agent stages, with mock models only |
 | 3 Backend Foundation | API gateway, auth, job manager, persistence | Not started |
 | 4 Frontend Foundation | Angular dashboard on real backend contracts | Not started |
@@ -29,8 +29,12 @@ Phases follow blueprint §18. Status reflects this repository only.
 - [ ] **M4 — Live agent verification.** Run both workflows against Gemini with
   a real credential and a gate signing secret: confirm Google Search and URL
   Context execute, that the agents produce the required JSON, and measure
-  tokens per run. Needs the owner's approval and credentials this environment
-  does not have. **Recommended next.**
+  tokens per run. **In progress.** Done: `hidaya-one-agent-api` deployed with
+  the gate secret; two verified-script runs (`SCRIPTS_DRAFTED`); the 808 s run
+  traced to a model call with no client deadline; per-call deadline and
+  token telemetry added (not yet deployed). Left: redeploy with the owner's
+  go-ahead, measure tokens per run from the telemetry, one bounded live run
+  of the production workflow. **Recommended next.**
 - [ ] **M5 — Source retrieval in code.** Have the gate fetch the cited passage
   from registered sources itself and compare, instead of trusting two agent
   reports. Closes the main limitation in `ARCHITECTURE.md`.
@@ -39,8 +43,8 @@ Phases follow blueprint §18. Status reflects this repository only.
 - [ ] **M7 — First real provider.** Tamil narration through Cloud
   Text-to-Speech, inside its free allowance, behind the provider adapter.
 - [ ] **M8 — Rendering.** FFmpeg and a headless browser in a Cloud Run job.
-- [ ] **M9 — Monorepo move.** Relocate to `apps/agent` and `packages/contracts`
-  once a second application needs the contracts.
+- [x] **M9 — Monorepo move.** The agent code is in `apps/agent`, next to
+  `apps/api` and `apps/web`.
 
 ## Decisions needed from the owner
 
@@ -52,11 +56,10 @@ Phases follow blueprint §18. Status reflects this repository only.
    should read.
 3. **Partial batches.** Passing records proceed while failed ones are
    withheld. Say if a single failure should instead hold the whole batch.
-4. **Other code.** The blueprint refers to an existing backend and Angular
-   monorepo. Neither is in this repository, and the Cloud project has one
-   Cloud Run service, `hidaya-one-dev`.
-5. **Is `hidaya-one-dev` public?** Port 8000 suggests it serves the ADK
-   development server. Please check its invoker permission
-   (`docs/google/GOOGLE_CONNECTOR_STATUS.md`).
-6. **Model access path.** The deployed service uses a Gemini API key. Confirm
-   whether to stay on the Developer API or move to Vertex AI.
+4. ~~**Other code.**~~ Settled: the backend and dashboard are in this
+   monorepo (`apps/api`, `apps/web`).
+5. ~~**Is `hidaya-one-dev` public?**~~ Settled: no public invoker (checked
+   2026-11-17, `docs/deployment.md`).
+6. **Model access path.** Both services now call Gemini through Vertex AI at
+   location `global` with the runtime service account. Confirm this is the
+   path to keep, and whether the unused `gemini-api-key` secret can go.

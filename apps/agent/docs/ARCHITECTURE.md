@@ -199,6 +199,35 @@ The default sink writes one JSON line to stdout, which Cloud Logging collects.
 The pipeline tool also appends each run's decisions to the Orchestrator's
 session state under `hidaya:gate_audit`, and returns them in its result.
 
+## Model-call bounds and telemetry
+
+`src/workflow/telemetry.ts`. `buildHidayaAgents()` wraps every agent's model
+in an `ObservedModel`, which:
+
+- sets a per-attempt deadline on each request (`HIDAYA_MODEL_TIMEOUT_MS`,
+  default 180 s). The Gemini SDK sets no client timeout, so before this a
+  stalled call waited for Vertex AI's 10-minute server limit. On 2026-11-16
+  one such call turned a ~210 s run into 808 s;
+- writes one `hidaya_telemetry` JSON line per model call: agent, model, run
+  ID, outcome (`OK`, `ERROR`, `TIMEOUT`, `CANCELLED`), latency, token counts
+  (prompt, output, thoughts, tool-use prompt, total) and, on failure, the
+  error code and a trimmed message. No prompt or output text is logged.
+
+ADK turns a model error into an error event, not an exception, so a failed
+helper call is otherwise invisible: the parent agent simply continues with
+less evidence. The telemetry line is what makes it visible.
+
+Both pipelines log a `PIPELINE_RUN` start and end line with status and
+duration, and run inside an `AsyncLocalStorage` context so every model call
+they make carries the run ID (the gate run ID, or the production job ID).
+Orchestrator calls carry no run ID. Nothing retries automatically: a call that
+times out fails, and the fail-closed rules decide the outcome.
+
+The model name is resolved on the first call rather than at build time,
+because the Gemini constructor throws without credentials and the module
+builds the default agents on import. A side effect: each agent now keeps one
+model client instead of ADK creating one per request.
+
 ## Production workflow
 
 `startProduction` runs one job: workflow 1, then, only if a script was drafted
@@ -315,10 +344,13 @@ What is not:
    store and no review or approval screen.
 6. **Symmetric key.** Anything holding the key can mint attestations. There is
    no key ID, rotation or expiry; an attested package stays valid.
-7. **Not run against a live model.** Whether Gemini reliably produces the
-   required JSON has not been tested. Output that does not parse is blocked.
+7. **Barely run against a live model.** Two live verified-script runs on
+   2026-11-17; the production workflow has not run live. Whether Gemini
+   reliably produces the required JSON is not established. Output that does
+   not parse is blocked.
 8. **Quran reference bounds are coarse.** Surah 1–114 and ayah 1–286 are
    checked, not the ayah count of each surah.
 9. **Cost limit scope.** The limit of 40 model calls per run covers the
    pipeline's own agents. Helper agents run in nested ADK runners and are not
-   counted by it.
+   counted by it. Their calls are bounded by the per-call deadline and logged
+   by the model telemetry, but not capped in number.

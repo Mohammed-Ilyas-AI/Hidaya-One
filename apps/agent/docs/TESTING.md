@@ -80,7 +80,27 @@ are marked `simulated`.
 
 `AGENT_EXECUTION_REPORT.md` maps these to the demonstration steps.
 
+## Model-call telemetry tests — `apps/agent/src/workflow/telemetry.test.ts`
+
+- `HIDAYA_MODEL_TIMEOUT_MS`: default, valid value, and non-integer or
+  out-of-range values refused.
+- Each call carries the deadline in `httpOptions.timeout` (existing headers
+  kept) and logs latency and token usage with the run ID.
+- A thrown server error is logged with its status and still reaches ADK; an
+  aborted attempt is logged as `TIMEOUT`; a response carrying an error code is
+  logged as `ERROR`.
+- A model given by name is not resolved at build time.
+- All 13 agents built by `agent.ts` use an observed model.
+- A verified-script run logs start and end and tags its three agents' calls
+  with its run ID; a production job tags its agents' calls with the job ID.
+
+Checked once by hand against the real SDK (not part of `npm test`): with
+`GOOGLE_GEMINI_BASE_URL` pointed at a local server that never answers and a
+10 s deadline, the call aborted at 10.0 s and was logged as `TIMEOUT`.
+
 ## Not covered
+
+- The deadline's effect on Cloud Run until the service is redeployed.
 
 - Real model behaviour: whether Gemini produces the required JSON, and whether
   Google Search and URL Context calls execute. Needs credentials.

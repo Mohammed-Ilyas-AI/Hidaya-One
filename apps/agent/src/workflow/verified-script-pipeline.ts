@@ -11,6 +11,7 @@ import {
   type LlmResponse,
 } from "@google/adk";
 import { z } from "zod";
+import { withRunId, type TelemetrySink } from "./telemetry.ts";
 import { EvidenceCandidateSchema, VerificationRecordSchema } from "../verification/contracts.ts";
 import {
   attestBatch,
@@ -266,6 +267,8 @@ export interface PipelineDeps {
   scriptAgent: LlmAgent;
   getGateConfig: () => GateConfig;
   audit: AuditSink;
+  /** Run start/end lines. Model calls inside the run are tagged with its runId. */
+  telemetry?: TelemetrySink;
   createRunId?: () => string;
 }
 
@@ -474,8 +477,30 @@ export async function runVerifiedScriptPipeline(
   request: string,
   options: { abortSignal?: AbortSignal } = {},
 ): Promise<PipelineResult> {
+  const runId = pipeline.deps.createRunId?.() ?? `run-${randomUUID()}`;
+  const telemetry = pipeline.deps.telemetry;
+  const started = Date.now();
+  telemetry?.record({ type: "PIPELINE_RUN", pipeline: "verified_script", runId, phase: "START" });
+  const result = await withRunId(runId, () => executeVerifiedScriptPipeline(pipeline, runId, request, options));
+  telemetry?.record({
+    type: "PIPELINE_RUN",
+    pipeline: "verified_script",
+    runId,
+    phase: "END",
+    status: result.status,
+    durationMs: Date.now() - started,
+    ...(result.error ? { error: result.error } : {}),
+  });
+  return result;
+}
+
+async function executeVerifiedScriptPipeline(
+  pipeline: VerifiedScriptPipeline,
+  runId: string,
+  request: string,
+  options: { abortSignal?: AbortSignal },
+): Promise<PipelineResult> {
   const { deps, workflow } = pipeline;
-  const runId = deps.createRunId?.() ?? `run-${randomUUID()}`;
   const appName = "hidaya_verified_script_pipeline";
   const userId = "pipeline";
   const runner = new InMemoryRunner({ agent: workflow, appName });

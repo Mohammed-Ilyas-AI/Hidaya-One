@@ -23,6 +23,12 @@ import {
   createProductionEntryGuard,
   createProductionTool,
 } from "./src/workflow/production-pipeline.ts";
+import {
+  ObservedModel,
+  consoleTelemetrySink,
+  modelTimeoutFromEnv,
+  type TelemetrySink,
+} from "./src/workflow/telemetry.ts";
 
 /**
  * HIDAYA ONE — ADK TypeScript port
@@ -173,6 +179,10 @@ export interface BuildOptions {
   providers?: Providers;
   /** Job tracking. Defaults to an in-memory store for this process. */
   jobStore?: JobStore;
+  /** Per-attempt deadline for every model call. Defaults to HIDAYA_MODEL_TIMEOUT_MS or 180 s. */
+  modelTimeoutMs?: number;
+  /** Model-call and run telemetry. Defaults to one JSON line per entry on stdout. */
+  telemetry?: TelemetrySink;
 }
 
 let warnedAboutKey = false;
@@ -191,7 +201,11 @@ export function gateConfigFromEnv(): GateConfig {
 }
 
 export function buildHidayaAgents(options: BuildOptions = {}) {
-const modelFor = (agentName: string) => options.modelFor?.(agentName) ?? options.model ?? MODEL;
+const modelTimeoutMs = options.modelTimeoutMs ?? modelTimeoutFromEnv();
+const telemetry = options.telemetry ?? consoleTelemetrySink;
+// Every agent's model is wrapped: a per-call deadline and one telemetry line per call.
+const modelFor = (agentName: string) =>
+  new ObservedModel(options.modelFor?.(agentName) ?? options.model ?? MODEL, { agentName, timeoutMs: modelTimeoutMs, sink: telemetry });
 const getGateConfig = options.getGateConfig ?? gateConfigFromEnv;
 const audit = options.audit ?? consoleAuditSink;
 const providers = options.providers ?? NOT_CONNECTED_PROVIDERS;
@@ -485,6 +499,7 @@ const pipeline = buildVerifiedScriptPipeline({
   scriptAgent,
   getGateConfig,
   audit,
+  telemetry,
   createRunId: options.createRunId,
 });
 
@@ -498,6 +513,7 @@ const productionSystem = {
     channelManager,
     getGateConfig,
     audit,
+    telemetry,
     providers,
     jobStore,
   },
