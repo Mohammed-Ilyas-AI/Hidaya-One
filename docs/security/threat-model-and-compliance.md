@@ -18,6 +18,9 @@ YouTube channel (reputation, OAuth refresh token), religious accuracy, Google Cl
 | T9 | Inauthentic/repetitive-content policy | YPP rejection | Topic-diversity checks, varied formats, real educational narrative per video, no template-only output; human editorial review of series design |
 | T10 | Undisclosed realistic AI content | Labels/penalties | Set `containsSyntheticMedia=true` when Omni footage is realistic; accept C2PA auto-label (cannot be removed) |
 | T11 | Prophet/companion depiction, sensitive imagery | Community harm | Prompt deny-list + multimodal QA classifier + reviewer |
+| T13 | VEED API key leak (key was pasted in chat 2026-11-23) | Credit drain | Rotate key; store only as network secret / Secret Manager; keep VEED prepaid balance small |
+| T14 | Avatar impersonates scholar or depicts prophet | Severe community harm | Avatar allow-list (founder/owned character only), reviewer approval of avatar image |
+| T15 | Expiring VEED output URLs / third-party retention | Lost assets, data retention | Copy to GCS immediately; `X-Veed-Store-IO: 0`; short signed input URLs |
 | T12 | Supply chain (deps, images) | Compromise | Pinned deps, Artifact Registry scanning, Cloud Build provenance |
 
 ## Compliance checklist

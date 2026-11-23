@@ -66,3 +66,10 @@ flowchart TD
   PUB -- no --> H
   SCHED --> AN[Analytics worker, async]
 ```
+
+## ADR-011 VEED Fabric 1.0 as presenter adapter (founder directive, 2026-11-23)
+- **Context:** Founder chose VEED for video creation. VEED's API provides image+audio → talking video (Fabric 1.0), lipsync, dubbing, reframe, background removal — **no scene/text-to-video and no subtitles yet** (see `docs/research/veed-api-evaluation.md`).
+- **Decision:** Add `PresenterGenerator` port with a VEED Fabric adapter (async submit/poll, GCS signed-URL inputs, immediate copy of expiring outputs to GCS, `X-Veed-Store-IO: 0`). Scenery = motion graphics (default) or Omni (optional). FFmpeg renderer composites presenter + scenery + exact text.
+- **Deviation from blueprint:** VEED is a non-Google hosted service; the blueprint's "Google-only hosted services" rule is relaxed for this adapter by founder decision. Data sent: TTS audio + avatar image only.
+- **Guardrails:** avatar must be founder (with consent) or an owned non-photoreal character; no prophets/companions/real scholars; no lip-synced Qur'anic recitation; VEED spend tracked by the same ledger reservation (VEED has prepaid credits — top-up amount acts as an external hard cap).
+- **Secret handling:** key held as an environment network secret / Secret Manager in production; never in code, logs or chat.

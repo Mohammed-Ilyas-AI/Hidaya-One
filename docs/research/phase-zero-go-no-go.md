@@ -38,4 +38,7 @@ M0 (owner unblock) → M1 Foundation → M2 Source registry → M3 Content graph
 
 **First milestone (M1, no paid calls):** repository skeleton + typed contracts + idempotent job store + cost-reservation gate + CI, all tested against emulators. Acceptance: duplicate scheduler invocation creates exactly one job; overspend reservation is denied; kill switch blocks all paid adapters.
 
+## Update 2026-11-23 — VEED
+Founder directed VEED for video creation. VEED key verified (free probe). VEED provides a talking presenter (Fabric 1.0, $0.15/s @720p) but no scene generation or subtitles, so it complements rather than replaces scenery + renderer. New owner decisions: **avatar image** (founder photo with consent / owned illustrated character / none) and **presenter seconds per Short** (recommend ~5 s → ≈$22.50/month). See `veed-api-evaluation.md`.
+
 **STOPPED. Awaiting explicit approval before any paid call, API enablement, IAM/OAuth change, deployment or upload.**

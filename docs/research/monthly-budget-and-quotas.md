@@ -33,6 +33,9 @@
 | E. Repo spec: 3 Shorts/day × 30–45 s Omni | ≈ $189–$283 (90 × 30–45 s × $0.07) | $50+ | $10 | **≈ $250–$345** | **4–7× over** |
 | F. 30 × Veo 3.1 Lite (2 × 8 s clips) | $24.00 | $17.70 | $5 | **≈ $47** | marginal; clip stitching needed |
 
+| G. VEED Fabric 5 s @720p + 10 s motion graphics (**new recommendation**) | $22.50 (VEED) | $17.70 | $5 | **≈ $45** | fits, thin headroom |
+| H. VEED Fabric full 15 s @720p | $67.50 | $17.70 | $5 | **≈ $90** | **exceeds** |
+
 **Conclusion:** $50/month is feasible only with (a) a mixed Omni + original motion-graphic policy or (b) very disciplined token budgets. The current repo target (3/day, 30–45 s) is not compatible with $50.
 
 **Expected first-month cash outlay (pilot month in 2027, Scenario C):** ≈ $40–50 + tax. A possible $10/month AI Pro Cloud credit (if activated) offsets some cost **but spend caps are computed on gross cost before credits**, so set caps on gross amounts.
