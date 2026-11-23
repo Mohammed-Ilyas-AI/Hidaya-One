@@ -1,0 +1,58 @@
+<template>
+  <style>
+    @font-face { font-family: "AmiriQ"; src: url("assets/fonts/AmiriQuran.ttf"); }
+    @font-face { font-family: "Ruqaa"; font-weight: 700; src: url("assets/fonts/aref-ruqaa-arabic-700-normal.woff2"); }
+    @font-face { font-family: "Corm"; font-weight: 500; src: url("assets/fonts/cormorant-garamond-latin-500-normal.woff2"); }
+    @font-face { font-family: "Corm"; font-weight: 600; src: url("assets/fonts/cormorant-garamond-latin-600-normal.woff2"); }
+    @font-face { font-family: "Corm"; font-weight: 500; font-style: italic; src: url("assets/fonts/cormorant-garamond-latin-500-italic.woff2"); }
+    @font-face { font-family: "TamilSerif"; font-weight: 500; src: url("assets/fonts/noto-serif-tamil-tamil-500-normal.woff2"); }
+    @font-face { font-family: "TamilSerif"; font-weight: 600; src: url("assets/fonts/noto-serif-tamil-tamil-600-normal.woff2"); }
+    #root { position: absolute; inset: 0; }
+    .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,6,18,0) 9%, rgba(4,6,18,var(--scrim,.45)) 22%, rgba(4,6,18,var(--scrim,.45)) 50%, rgba(4,6,18,0) 60%); }
+    .col { position: absolute; left: 120px; width: 660px; text-align: center; }
+    .col-n { position: absolute; left: 120px; width: 660px; text-align: center; }
+    .w { display: inline-block; }
+    .ar { font-family: "AmiriQ"; color: #FFF6DF; text-shadow: 0 0 26px rgba(255,214,140,.45), 0 3px 14px rgba(0,0,0,.7); }
+    .ta { font-family: "TamilSerif"; color: #FFFDF6; text-shadow: 0 2px 20px rgba(0,0,0,.75); }
+    .en { font-family: "Corm"; font-style: italic; font-weight: 500; color: #F1E6CF; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+    #root { --scrim: .4; }
+    .ref { font: 600 28px/1 "Corm"; letter-spacing: .32em; color: #EBD9A6; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+    .verse-ar { font-size: 96px; line-height: 1.85; }
+    .verse-ta { font-weight: 500; font-size: 46px; line-height: 1.6; }
+    .verse-en { margin-top: 22px; font-size: 46px; line-height: 1.35; }
+  </style>
+  <div id="root" data-composition-id="verse" data-width="1080" data-height="1920">
+    <div class="scrim" data-layout-ignore></div>
+    <div id="verse-ref" class="clip col" data-start="0.4" data-duration="14.35" style="top:300px"><div id="verse-ref-in" class="ref">AL-BAQARAH&nbsp;&nbsp;·&nbsp;&nbsp;2:153</div></div>
+    <div id="v-ar0" class="clip col" data-start="0.0" data-duration="4.6" data-hold style="top:380px"><div id="v-ar0-in" class="ar verse-ar fit" dir="rtl" lang="ar">يَٰٓأَيُّهَا ٱلَّذِينَ ءَامَنُوا۟</div></div>
+    <div id="v-tr0" class="clip col-n" data-start="0.35" data-duration="4.25" data-hold style="top:820px"><div class="ta verse-ta fit" lang="ta"><span class="w " id="v-taw0-0">நம்பிக்கை</span> <span class="w " id="v-taw0-1">கொண்டோரே!</span></div><div id="v-en0-in" class="en verse-en" lang="en">O you who have believed,</div></div>
+    <div id="v-ar1" class="clip col" data-start="4.6" data-duration="4.52" data-hold style="top:380px"><div id="v-ar1-in" class="ar verse-ar fit" dir="rtl" lang="ar">ٱسْتَعِينُوا۟ بِٱلصَّبْرِ وَٱلصَّلَوٰةِ ۚ</div></div>
+    <div id="v-tr1" class="clip col-n" data-start="4.95" data-duration="4.17" data-hold style="top:820px"><div class="ta verse-ta fit" lang="ta"><span class="w " id="v-taw1-0">பொறுமையுடனும்,</span> <span class="w " id="v-taw1-1">தொழுகையுடனும்(இறைவனிடம்)</span> <span class="w " id="v-taw1-2">உதவி</span> <span class="w " id="v-taw1-3">தேடுங்கள்;.</span></div><div id="v-en1-in" class="en verse-en" lang="en">seek help through patience and prayer.</div></div>
+    <div id="v-ar2" class="clip col" data-start="9.12" data-duration="5.63" data-hold style="top:380px"><div id="v-ar2-in" class="ar verse-ar fit" dir="rtl" lang="ar">إِنَّ ٱللَّهَ مَعَ ٱلصَّٰبِرِينَ</div></div>
+    <div id="v-tr2" class="clip col-n" data-start="9.47" data-duration="5.28" data-hold style="top:820px"><div class="ta verse-ta fit" lang="ta"><span class="w " id="v-taw2-0">நிச்சயமாக</span> <span class="w " id="v-taw2-1">அல்லாஹ்</span> <span class="w " id="v-taw2-2">பொறுமையுடையவர்களுடன்</span> <span class="w " id="v-taw2-3">இருக்கிறான்.</span></div><div id="v-en2-in" class="en verse-en" lang="en">Indeed, Allah is with the patient.</div></div>
+  </div>
+  <script>
+    function fitWords(sel, maxW) {
+      document.querySelectorAll(sel).forEach((el) => {
+        const ws = el.querySelectorAll(".w"); let fs = parseFloat(getComputedStyle(el).fontSize);
+        for (let k = 0; k < 30; k++) { const wide = Math.max(0, ...[...ws].map((w) => w.getBoundingClientRect().width)); if (wide <= maxW) break; fs -= 2; el.style.fontSize = fs + "px"; }
+      });
+    }
+    fitWords(".fit", 640);
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#verse-ref-in", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "expo.out" }, 0.4);
+    tl.fromTo("#v-ar0-in", { opacity: 0, filter: "blur(10px)", scale: 1.03 }, { opacity: 1, filter: "blur(0px)", scale: 1, duration: 0.45, ease: "expo.out" }, 0.02);
+    for (let i = 0; i < 2; i++) tl.fromTo("#v-taw0-" + i, { opacity: 0, color: "#8C8A86" }, { opacity: 1, color: "#FFFDF6", duration: 0.25, ease: "power2.out" }, 0.4 + i * 0.09);
+    tl.fromTo("#v-en0-in", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 0.73);
+    tl.to(["#v-ar0-in", "#v-tr0 > div"], { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power3.in" }, 4.4);
+    tl.fromTo("#v-ar1-in", { opacity: 0, filter: "blur(10px)", scale: 1.03 }, { opacity: 1, filter: "blur(0px)", scale: 1, duration: 0.45, ease: "expo.out" }, 4.619999999999999);
+    for (let i = 0; i < 4; i++) tl.fromTo("#v-taw1-" + i, { opacity: 0, color: "#8C8A86" }, { opacity: 1, color: "#FFFDF6", duration: 0.25, ease: "power2.out" }, 5.0 + i * 0.09);
+    tl.fromTo("#v-en1-in", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 5.51);
+    tl.to(["#v-ar1-in", "#v-tr1 > div"], { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power3.in" }, 8.92);
+    tl.fromTo("#v-ar2-in", { opacity: 0, filter: "blur(10px)", scale: 1.03 }, { opacity: 1, filter: "blur(0px)", scale: 1, duration: 0.45, ease: "expo.out" }, 9.139999999999999);
+    for (let i = 0; i < 4; i++) tl.fromTo("#v-taw2-" + i, { opacity: 0, color: "#8C8A86" }, { opacity: 1, color: "#FFFDF6", duration: 0.25, ease: "power2.out" }, 9.52 + i * 0.09);
+    tl.fromTo("#v-en2-in", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 10.03);
+    tl.to(["#v-ar2-in", "#v-tr2 > div"], { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power3.in" }, 14.55);
+    window.__timelines["verse"] = tl;
+  </script>
+</template>

@@ -1,0 +1,87 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #02040c; }
+    #sky-gl, #sky-dust { position: absolute; inset: 0; width: 1080px; height: 1920px; }
+  </style>
+  <div id="root" data-composition-id="sky" data-width="1080" data-height="1920" data-layout-ignore>
+    <canvas id="sky-gl" width="720" height="1280"></canvas>
+    <canvas id="sky-dust" width="1080" height="1920"></canvas>
+  </div>
+  <script>
+    (function () {
+      // Dawn curve: night through the hook, warming under the recitation, sunrise on "inna Allaha ma'a s-sabirin".
+      const KEYS = [[0, 0.0], [3.2, 0.04], [12.3, 0.32], [17.95, 0.6], [21.5, 0.9], [25.4, 1.0], [30, 1.0]];
+      const ease = (x) => (x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
+      const dawnAt = (t) => { for (let i = 1; i < KEYS.length; i++) if (t <= KEYS[i][0]) { const [a, va] = KEYS[i - 1], [b, vb] = KEYS[i]; return va + (vb - va) * ease((t - a) / (b - a)); } return 1; };
+      const FS = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uT, uDawn; out vec4 o;
+float h(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p,int oc){float v=0.,a=.5;for(int i=0;i<6;i++){if(i>=oc)break;v+=a*n(p);p=mat2(1.6,1.2,-1.2,1.6)*p;a*=.5;}return v;}
+vec3 skyCol(float y,float d){
+  vec3 nT=vec3(.008,.014,.055),nH=vec3(.05,.07,.18),pT=vec3(.06,.06,.19),pH=vec3(.78,.42,.42),sT=vec3(.07,.13,.33),sH=vec3(1.,.52,.2);
+  float a=smoothstep(0.,.55,d),b=smoothstep(.45,1.,d);
+  return mix(mix(mix(nH,pH,a),sH,b),mix(mix(nT,pT,a),sT,b),pow(clamp(y,0.,1.),.55));}
+float ridge(float x,float base,float amp,float fr,float s,float dr){return base+amp*(.55*sin(x*fr+s)+.3*sin(x*fr*2.3+s*1.7)+.3*(fbm(vec2(x*fr*1.5+dr,s),3)-.5));}
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes; float asp=uRes.x/uRes.y;
+  vec2 q=(uv-vec2(.5,.36))*(1.-.06*uT/30.)+vec2(.5,.36);
+  float hor=.34; vec2 sun=vec2(.78,mix(.22,.375,smoothstep(.05,1.,uDawn)));
+  vec3 col=skyCol((q.y-hor)/(1.-hor),uDawn);
+  float ds=length((q-sun)*vec2(asp,1.)); vec3 sc=mix(vec3(1.,.5,.25),vec3(1.,.72,.4),uDawn);
+  col+=sc*(1.1*exp(-ds*11.)+.22*exp(-ds*3.8))*smoothstep(.15,.6,uDawn);
+    vec2 sp=q*vec2(asp,1.)*380.; float st=h(floor(sp));
+  col+=vec3(.9,.92,1.)*step(.9965,st)*smoothstep(.12,0.,length(fract(sp)-.5))*(.6+.4*sin(uT*2.+st*90.))*(1.-smoothstep(.15,.55,uDawn))*step(hor,q.y);
+  vec2 cp=vec2(q.x*asp*2.2+uT*.018,q.y*5.5); vec2 w=vec2(fbm(cp+vec2(0.,uT*.01),4),fbm(cp+vec2(5.2,1.3),4));
+  float cd=fbm(cp+2.2*w,6); float c=smoothstep(.48,.78,cd)*smoothstep(.36,.5,q.y)*smoothstep(.98,.62,q.y);
+  float lit=clamp(1.-ds*1.6,0.,1.);
+  vec3 cc=mix(mix(vec3(.03,.04,.1),vec3(.25,.16,.28),smoothstep(.2,.7,uDawn)),mix(vec3(.2,.22,.38),vec3(1.,.72,.45),smoothstep(.25,.9,uDawn)),clamp(.25+lit*1.3*(cd-.4)*2.,0.,1.));
+  col=mix(col,cc,c*.92);
+  float r=0.; vec2 dir=(sun-q)/10.; vec2 rp=q;
+  for(int i=0;i<10;i++){rp+=dir; r+=1.-smoothstep(.48,.78,fbm(vec2(rp.x*asp*2.2+uT*.018,rp.y*5.5),3))*smoothstep(.36,.5,rp.y)*smoothstep(.98,.62,rp.y);}
+  col+=sc*pow(r/10.,3.)*exp(-ds*2.5)*.55*smoothstep(.3,.85,uDawn)*step(hor,q.y);
+  for(int L=0;L<3;L++){float fl=float(L);
+    float rg=ridge(q.x*asp+uT*.004*(fl+1.),hor-.02-fl*.085,.03+fl*.018,3.2-fl*.7,fl*3.1+1.,fl);
+    float m=smoothstep(rg+.002,rg-.002,q.y);
+    vec3 dn=mix(vec3(.02,.02,.05),vec3(.36,.17,.09),smoothstep(.2,1.,uDawn))*(1.-fl*.28);
+    dn+=sc*.35*smoothstep(.02,0.,rg-q.y)*smoothstep(.3,1.,uDawn)*(1.-fl*.3);
+    dn*=.85+.15*fbm(vec2(q.x*asp*40.,q.y*90.),2); col=mix(col,dn,m);}
+  col+=vec3(1.,.6,.4)*.12*exp(-abs(q.y-hor)*18.)*smoothstep(.2,.8,uDawn);
+  col=1.-exp(-col*1.55); col=pow(col,vec3(1.05));
+  float sunUp=smoothstep(.3,.7,uDawn)*step(hor-.004,q.y+.0);
+  col+=vec3(1.,.62,.3)*.45*exp(-ds*26.)*sunUp;
+  col=mix(col,vec3(1.,.93,.74),smoothstep(.034,.029,ds)*sunUp);
+  vec2 v=uv-.5; col*=1.-.88*dot(v*vec2(1.,.8),v*vec2(1.,.8));
+  o=vec4(col,1.);}`;
+      const cv = document.getElementById("sky-gl");
+      const gl = cv.getContext("webgl2", { preserveDrawingBuffer: true });
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, "#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0,1);}"));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog); gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const U = { res: gl.getUniformLocation(prog, "uRes"), t: gl.getUniformLocation(prog, "uT"), d: gl.getUniformLocation(prog, "uDawn") };
+      gl.uniform2f(U.res, cv.width, cv.height);
+      // seeded dust (mulberry32)
+      let s = 2153 >>> 0; const rnd = () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const motes = Array.from({ length: 90 }, () => ({ x: rnd() * 1080, y: rnd() * 1920, r: 1 + rnd() * 3, v: 6 + rnd() * 16, ph: rnd() * 6.283, b: rnd() < 0.18 }));
+      const dust = document.getElementById("sky-dust").getContext("2d");
+      function renderAt(t) {
+        const d = dawnAt(t);
+        gl.uniform1f(U.t, t); gl.uniform1f(U.d, d); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        dust.clearRect(0, 0, 1080, 1920);
+        for (const m of motes) {
+          const y = (((m.y - t * m.v) % 1920) + 1920) % 1920, x = m.x + Math.sin(t * 0.6 + m.ph) * 14;
+          const a = (0.25 + 0.35 * Math.sin(t * 1.3 + m.ph)) * (0.35 + 0.65 * d);
+          if (m.b) { const g = dust.createRadialGradient(x, y, 0, x, y, m.r * 9); g.addColorStop(0, `rgba(255,214,150,${a * 0.35})`); g.addColorStop(1, "rgba(255,214,150,0)"); dust.fillStyle = g; dust.beginPath(); dust.arc(x, y, m.r * 9, 0, 6.283); dust.fill(); }
+          else { dust.fillStyle = `rgba(255,228,170,${a})`; dust.beginPath(); dust.arc(x, y, m.r, 0, 6.283); dust.fill(); }
+        }
+      }
+      window.addEventListener("hf-seek", (e) => renderAt(e.detail.time));
+      renderAt(0);
+    })();
+  </script>
+</template>

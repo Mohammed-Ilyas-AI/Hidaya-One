@@ -1,0 +1,40 @@
+<template>
+  <style>
+    @font-face { font-family: "AmiriQ"; src: url("assets/fonts/AmiriQuran.ttf"); }
+    @font-face { font-family: "Ruqaa"; font-weight: 700; src: url("assets/fonts/aref-ruqaa-arabic-700-normal.woff2"); }
+    @font-face { font-family: "Corm"; font-weight: 500; src: url("assets/fonts/cormorant-garamond-latin-500-normal.woff2"); }
+    @font-face { font-family: "Corm"; font-weight: 600; src: url("assets/fonts/cormorant-garamond-latin-600-normal.woff2"); }
+    @font-face { font-family: "Corm"; font-weight: 500; font-style: italic; src: url("assets/fonts/cormorant-garamond-latin-500-italic.woff2"); }
+    @font-face { font-family: "TamilSerif"; font-weight: 500; src: url("assets/fonts/noto-serif-tamil-tamil-500-normal.woff2"); }
+    @font-face { font-family: "TamilSerif"; font-weight: 600; src: url("assets/fonts/noto-serif-tamil-tamil-600-normal.woff2"); }
+    #root { position: absolute; inset: 0; }
+    .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,6,18,0) 9%, rgba(4,6,18,var(--scrim,.45)) 22%, rgba(4,6,18,var(--scrim,.45)) 50%, rgba(4,6,18,0) 60%); }
+    .col { position: absolute; left: 120px; width: 660px; text-align: center; }
+    .col-n { position: absolute; left: 120px; width: 660px; text-align: center; }
+    .w { display: inline-block; }
+    .ar { font-family: "AmiriQ"; color: #FFF6DF; text-shadow: 0 0 26px rgba(255,214,140,.45), 0 3px 14px rgba(0,0,0,.7); }
+    .ta { font-family: "TamilSerif"; color: #FFFDF6; text-shadow: 0 2px 20px rgba(0,0,0,.75); }
+    .en { font-family: "Corm"; font-style: italic; font-weight: 500; color: #F1E6CF; text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+    #root { --scrim: .42; }
+    .brand { font: 600 76px/1 "Corm"; letter-spacing: .24em; padding-left: .26em; color: #FFF4D8; text-shadow: 0 0 30px rgba(255,200,120,.45); }
+    .sub { font: 500 30px/1.5 "Corm"; letter-spacing: .06em; color: #F6EAD0; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
+  </style>
+  <div id="root" data-composition-id="end" data-width="1080" data-height="1920">
+    <div class="scrim" data-layout-ignore></div>
+    <div id="end-brand" class="clip col" data-start="0.2" data-duration="4.4" data-hold style="top:600px"><div class="brand"><span class="w" id="end-l0">H</span><span class="w" id="end-l1">I</span><span class="w" id="end-l2">D</span><span class="w" id="end-l3">A</span><span class="w" id="end-l4">Y</span><span class="w" id="end-l5">A</span><span class="w" id="end-l6">H</span></div></div>
+    <div id="end-sub" class="clip col" data-start="1.1" data-duration="3.5" data-hold style="top:720px"><div id="end-sub-in" class="sub">Al-Baqarah 2:153<br>Recitation · Mishary Rashid Alafasy</div></div>
+  </div>
+  <script>
+    function fitWords(sel, maxW) {
+      document.querySelectorAll(sel).forEach((el) => {
+        const ws = el.querySelectorAll(".w"); let fs = parseFloat(getComputedStyle(el).fontSize);
+        for (let k = 0; k < 30; k++) { const wide = Math.max(0, ...[...ws].map((w) => w.getBoundingClientRect().width)); if (wide <= maxW) break; fs -= 2; el.style.fontSize = fs + "px"; }
+      });
+    }
+    fitWords(".fit", 640);
+    const tl = gsap.timeline({ paused: true });
+    for (let i = 0; i < 7; i++) tl.fromTo("#end-l" + i, { opacity: 0.0, filter: "blur(3px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.3, ease: "power2.out" }, 0.25 + i * 0.1);
+    tl.fromTo("#end-sub-in", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.15);
+    window.__timelines["end"] = tl;
+  </script>
+</template>

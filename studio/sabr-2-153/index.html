@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="assets/lib/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #02040c; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="30" data-width="1080" data-height="1920">
+      <div id="sky" data-composition-id="sky" data-composition-src="compositions/sky.html" data-start="0" data-duration="30"
+           data-track-index="0" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:1"></div>
+      <div id="hook" data-composition-id="hook" data-composition-src="compositions/hook.html" data-start="0" data-duration="3.2"
+           data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:2"></div>
+      <div id="verse" data-composition-id="verse" data-composition-src="compositions/verse.html" data-start="3.2" data-duration="14.75"
+           data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:3"></div>
+      <div id="reflect" data-composition-id="reflect" data-composition-src="compositions/reflect.html" data-start="17.95" data-duration="7.45"
+           data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:4"></div>
+      <div id="end" data-composition-id="end" data-composition-src="compositions/end.html" data-start="25.4" data-duration="4.6"
+           data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920" style="z-index:5"></div>
+      <audio id="recitation" class="clip" src="assets/audio/recitation-2-153-alafasy.mp3" data-start="3.2" data-duration="14.45"
+             data-track-index="2" data-volume="1" data-fade-in="0.05"></audio>
+      <audio id="reprise" class="clip" src="assets/audio/recitation-2-153-alafasy.mp3" data-start="18.5" data-media-start="9.12" data-duration="5.33"
+             data-track-index="2" data-volume="1" data-fade-in="0.05" data-fade-out="0.4"></audio>
+      <audio id="air" class="clip" src="assets/audio/desert-air.mp3" data-start="0" data-duration="30"
+             data-track-index="3" data-volume="0.35" data-fade-in="1.5" data-fade-out="2.5"></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
