@@ -1,7 +1,7 @@
 # REVIEW — Sabr · 2:153 (HyperFrames 0.9.86)
 
 **Creative calls.** Storyline "The night before dawn" (desert night → sunrise as *inna Allāha maʿa ṣ-ṣābirīn* is recited).
-Not built: "the single lamp", "the river stone". Background is a code-drawn WebGL scene (no stock, no generator, no API).
+Not built: "the single lamp", "the river stone". Background (v2): three licensed Adobe Stock clips — Milky Way night → golden dunes → desert sunrise — graded with `media-treatment` (exposure/highlights down, +vibrance, vignette 0.35, grain 0.08) for text legibility; slow camera push on each plate; gold-dust overlay kept from v1.
 Verse revealed phrase by phrase on the recitation's measured dips (4.60 s, 9.12 s = waqf). Phrase 3 recitation reprised under the sunrise.
 
 **Measured.** `check`: ok (0 errors; 1 lint warning `timeline_track_too_dense` on verse.html, kept: 7 timed items is the verse's natural count).
