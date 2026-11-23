@@ -1,0 +1,56 @@
+{
+  "sourceId": "quran:2:153",
+  "surahNumber": 2,
+  "ayahNumber": 153,
+  "surahNameEn": "Al-Baqara",
+  "arabic": {
+    "editionId": "quran-uthmani",
+    "editionName": "Uthmani",
+    "provider": "api.alquran.cloud",
+    "lang": "ar",
+    "text": "يَٰٓأَيُّهَا ٱلَّذِينَ ءَامَنُوا۟ ٱسْتَعِينُوا۟ بِٱلصَّبْرِ وَٱلصَّلَوٰةِ ۚ إِنَّ ٱللَّهَ مَعَ ٱلصَّٰبِرِينَ",
+    "sha256": "e902f1691f7230424d99492ba72c315a965f5248eb39379549eb894fb551e9bb",
+    "fetchedAt": "2026-11-23T18:17:11.487Z"
+  },
+  "arabicCrossCheck": {
+    "editionId": "tanzil-uthmani",
+    "editionName": "Tanzil Uthmani",
+    "provider": "tanzil.net",
+    "lang": "ar",
+    "text": "يَٰٓأَيُّهَا ٱلَّذِينَ ءَامَنُوا۟ ٱسْتَعِينُوا۟ بِٱلصَّبْرِ وَٱلصَّلَوٰةِ إِنَّ ٱللَّهَ مَعَ ٱلصَّٰبِرِينَ",
+    "sha256": "27460dea15329355458c79dcea6936ae0fd7e5f9a7859bdb65ad1a9ee0dcfa98",
+    "fetchedAt": "2026-11-23T18:17:12.694Z"
+  },
+  "translations": [
+    {
+      "editionId": "ta.tamil",
+      "editionName": "Jan Turst Foundation",
+      "provider": "api.alquran.cloud",
+      "lang": "ta",
+      "text": "நம்பிக்கை கொண்டோரே! பொறுமையுடனும், தொழுகையுடனும்(இறைவனிடம்) உதவி தேடுங்கள்;. நிச்சயமாக அல்லாஹ் பொறுமையுடையவர்களுடன் இருக்கிறான்.",
+      "sha256": "3915979c1fb3a5757204a25f3e76bca3eac29f294e93a92e9530cb424a48922c",
+      "fetchedAt": "2026-11-23T18:17:13.783Z"
+    },
+    {
+      "editionId": "en.sahih",
+      "editionName": "Saheeh International",
+      "provider": "api.alquran.cloud",
+      "lang": "en",
+      "text": "O you who have believed, seek help through patience and prayer. Indeed, Allah is with the patient.",
+      "sha256": "73513c50dbf342952e5f57d0ee5a25041ff8def9dbe1bdda5d5f3561a2a2a7a1",
+      "fetchedAt": "2026-11-23T18:17:13.783Z"
+    }
+  ],
+  "recitation": {
+    "reciter": "Mishary Rashid Alafasy",
+    "url": "https://everyayah.com/data/Alafasy_128kbps/002153.mp3",
+    "localPath": "(fixture)",
+    "durationSec": 14.550204,
+    "sha256": "cf1b7ee278c3fb68bd518eff661013c1fdb5abb340708eaae7e586eebbbbdb8e"
+  },
+  "license": [
+    "Qur'an text: Tanzil Project (CC BY 3.0, verbatim only) — credit tanzil.net",
+    "Translations via alquran.cloud: Jan Turst Foundation (ta), Saheeh International (en) — permission for commercial/monetized use NOT yet confirmed",
+    "Recitation: Mishary Rashid Alafasy via everyayah.com — usage permission NOT yet confirmed"
+  ]
+}

@@ -1,0 +1,155 @@
+<!doctype html>
+<!-- Hidayah composition — look adapted from FavStash "Gilded Illumination" (Apache-2.0), aniconic:
+     flat lapis pigment, gold 8-point stars that alone catch light, vermilion/lapis border, vellum scroll.
+     Deterministic: every frame is a pure function of t (seeded noise, no clock, no Math.random). -->
+<html><head><meta charset="utf-8">
+<style>
+  :root{--gold:#E9C46A;--gold-d:#B8862B;--ink:#3B2414;--vellum:#F1E5C8;--lapis:#1F3F9A;--verm:#C8321F;--lead:#FBF6EA}
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#0B1638}
+  canvas{position:absolute;inset:0}
+  .group{position:absolute;left:110px;right:110px;display:flex;flex-direction:column;align-items:center;gap:26px}
+  .g-intro{top:600px}.g-verse{top:380px}.g-take{top:560px}
+  .g-trans{top:430px;left:120px;right:120px;padding:70px 56px 64px;border-radius:18px;opacity:0;gap:34px;
+           background:radial-gradient(ellipse at 50% 40%,#F7EED6,#E7D6AE);border:6px solid var(--ink);
+           box-shadow:inset 0 0 40px rgba(120,80,30,.35),0 18px 40px rgba(0,0,0,.6)}
+  .g-trans:before,.g-trans:after{content:"";position:absolute;left:-26px;right:-26px;height:46px;border-radius:23px;
+           background:linear-gradient(#C9A46A,#8C6532 60%,#5E401C);border:4px solid var(--ink)}
+  .g-trans:before{top:-34px}.g-trans:after{bottom:-34px}
+  .seg{position:relative;width:100%;text-align:center;opacity:0;will-change:opacity,transform;overflow-wrap:normal}
+  .title{font:400 250px/1.35 "Amiri Quran";background:linear-gradient(180deg,#FFF1B8,#E9C46A 45%,#A8741F);
+         -webkit-background-clip:text;color:transparent;filter:drop-shadow(0 6px 18px rgba(0,0,0,.55))}
+  .hook{font:600 66px/1.45 "Noto Sans Tamil";color:var(--lead);text-shadow:0 3px 14px rgba(0,0,0,.7)}
+  .hook2{font:italic 400 46px/1.35 "Noto Serif";color:#C9D5F2;text-shadow:0 3px 12px rgba(0,0,0,.7)}
+  .verse{font:400 88px/2.05 "Amiri Quran";color:#F6DB8E;text-shadow:0 0 22px rgba(233,196,106,.35),0 4px 10px rgba(0,0,0,.75)}
+  .ref{width:auto;font:700 38px/1 "Noto Serif";letter-spacing:2px;color:var(--lead);padding:16px 40px;
+       background:linear-gradient(#C8321F,#8E1E12);border:5px solid var(--gold);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  .credit{font:italic 400 30px/1.3 "Noto Serif";color:#B9C6E6}
+  .trans_ta{font:500 52px/1.6 "Noto Sans Tamil";color:var(--ink)}
+  .trans_en{font:italic 400 44px/1.45 "Noto Serif";color:#4A3020}
+  .take_ta{font:700 62px/1.55 "Noto Sans Tamil";background:linear-gradient(180deg,#FFF1B8,#E9C46A 50%,#B07A22);
+           -webkit-background-clip:text;color:transparent;filter:drop-shadow(0 4px 12px rgba(0,0,0,.6))}
+  .take_en{font:italic 400 52px/1.4 "Noto Serif";color:var(--lead);text-shadow:0 3px 12px rgba(0,0,0,.7)}
+  .brand{width:auto;font:700 44px/1 "Noto Serif";letter-spacing:10px;color:#FFF3C9;padding:22px 48px;margin-top:40px;
+         background:linear-gradient(#C8321F,#8E1E12);border:6px solid var(--gold);border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.55)}
+</style></head>
+<body><canvas id="c" width="1080" height="1920"></canvas><div id="root"></div>
+<script>
+let SB, grain, stars = [], dots = [];
+const W = 1080, H = 1920;
+function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
+const ease = x => x<0?0:x>1?1:x*x*(3-2*x);
+function lerpKeys(keys,t){for(let i=1;i<keys.length;i++){if(t<=keys[i].t){const a=keys[i-1],b=keys[i];return a.night+(b.night-a.night)*ease((t-a.t)/(b.t-a.t))}}return keys[keys.length-1].night}
+
+window.setup = (sb) => {
+  SB = sb; const r = rng(153);
+  for (let i=0;i<46;i++) stars.push({x:90+r()*900,y:90+r()*1700,s:10+Math.pow(r(),2.2)*34,rot:r()*0.8,ph:r()*6.28,eight:r()>.35});
+  for (let i=0;i<70;i++) dots.push({x:80+r()*920,y:80+r()*1760,ph:r()*6.28});
+  // ground-pigment grain (ultramarine reads as powder), multiplied ~14 %
+  grain = document.createElement('canvas'); grain.width=W; grain.height=H;
+  const g = grain.getContext('2d'), img = g.createImageData(W,H), gr = rng(7);
+  for (let i=0;i<img.data.length;i+=4){const v=200+gr()*55;img.data[i]=img.data[i+1]=img.data[i+2]=v;img.data[i+3]=255}
+  g.putImageData(img,0,0);
+  const root = document.getElementById('root');
+  const GROUP = {title:'intro',hook:'intro',hook2:'intro',verse:'verse',ref:'verse',credit:'verse',trans_ta:'trans',trans_en:'trans',take_ta:'take',take_en:'take',brand:'take'};
+  const groups = {};
+  for (const g of ['intro','verse','trans','take']) { const d=document.createElement('div'); d.className='group g-'+g; d.id='g-'+g; root.appendChild(d); groups[g]=d; }
+  for (const s of SB.segments) {
+    const el = document.createElement('div');
+    el.className = 'seg ' + s.role; el.lang = s.lang; el.dir = s.dir; el.dataset.id = s.id;
+    el.textContent = s.text;               // exact string, never parsed as HTML
+    el.dataset.start = s.start; el.dataset.end = s.end;
+    groups[GROUP[s.role]].appendChild(el);
+  }
+  return document.fonts.ready.then(() => { fitAll(); return true; });
+};
+
+function star(c, x, y, s, rot, eight, glow){
+  // khatam: two squares rotated 45° (8-point) or a single 6-point, laid as gold leaf
+  c.save(); c.translate(x,y); c.rotate(rot);
+  const gg = c.createLinearGradient(-s,-s,s,s);
+  gg.addColorStop(0,`rgba(255,241,184,${.55+.45*glow})`); gg.addColorStop(.5,`rgba(233,196,106,${.7+.3*glow})`); gg.addColorStop(1,'rgba(150,100,30,.95)');
+  c.fillStyle = gg; c.strokeStyle='rgba(59,36,20,.85)'; c.lineWidth=Math.max(1.2,s*.06);
+  const sq = (a)=>{c.save();c.rotate(a);c.beginPath();c.rect(-s*.62,-s*.62,s*1.24,s*1.24);c.fill();c.stroke();c.restore()};
+  if (eight){ sq(0); sq(Math.PI/4); }
+  else { for (const a of [0,Math.PI]){c.save();c.rotate(a);c.beginPath();c.moveTo(0,-s);c.lineTo(s*.87,s*.5);c.lineTo(-s*.87,s*.5);c.closePath();c.fill();c.stroke();c.restore()} }
+  if (glow>.25){ c.globalAlpha=(glow-.25)*.9; c.fillStyle='#FFF7D6'; c.beginPath(); c.arc(0,0,s*.22,0,6.283); c.fill(); c.globalAlpha=1; }
+  c.restore();
+}
+
+function border(c, t){
+  const b = 62, seg = 120;
+  c.fillStyle = '#132A6E'; c.fillRect(0,0,W,b); c.fillRect(0,H-b,W,b); c.fillRect(0,0,b,H); c.fillRect(W-b,0,b,H);
+  const paint = (x,y,w,h,i)=>{ c.fillStyle = i%2 ? '#1F3F9A' : '#C8321F'; c.fillRect(x,y,w,h); };
+  let i=0; for (let x=0;x<W;x+=seg,i++){ paint(x,0,seg,b,i); paint(x,H-b,seg,b,i+1); }
+  i=0; for (let y=0;y<H;y+=seg,i++){ paint(0,y,b,seg,i+1); paint(W-b,y,b,seg,i); }
+  c.strokeStyle='rgba(251,246,234,.85)'; c.lineWidth=3;               // white-lead zig-zag
+  const zig=(x0,y0,x1,y1,n)=>{c.beginPath();for(let k=0;k<=n;k++){const f=k/n,x=x0+(x1-x0)*f,y=y0+(y1-y0)*f,o=(k%2?8:-8);c.lineTo(x+(y0===y1?0:o),y+(y0===y1?o:0))}c.stroke()};
+  zig(0,b/2,W,b/2,54); zig(0,H-b/2,W,H-b/2,54); zig(b/2,0,b/2,H,96); zig(W-b/2,0,W-b/2,H,96);
+  c.strokeStyle='#E9C46A'; c.lineWidth=4; c.strokeRect(b,b,W-2*b,H-2*b);
+  for (let x=0;x<=W;x+=seg) { star(c,x,b/2,15,0,true,.3+.3*Math.sin(t*1.7+x)); star(c,x,H-b/2,15,0,true,.3+.3*Math.sin(t*1.7+x+1)); }
+  for (let y=seg;y<H;y+=seg) { star(c,b/2,y,15,0,true,.3+.3*Math.sin(t*1.5+y)); star(c,W-b/2,y,15,0,true,.3+.3*Math.sin(t*1.5+y+2)); }
+}
+
+const MAXLINES = {title:1,hook:2,hook2:2,verse:4,ref:1,credit:1,trans_ta:7,trans_en:4,take_ta:3,take_en:2,brand:1};
+// auto-fit: shrink font until no word overflows the column and the line budget holds
+function fitAll(){
+  for (const el of document.querySelectorAll('.seg')) {
+    const role = [...el.classList].find(c => MAXLINES[c]); let fs = parseFloat(getComputedStyle(el).fontSize);
+    for (let i=0;i<40;i++){
+      const lh = parseFloat(getComputedStyle(el).lineHeight) || fs*1.4;
+      const cs = getComputedStyle(el); const inner = el.scrollHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const lines = Math.round(inner / lh);
+      if (el.scrollWidth <= el.clientWidth + 1 && lines <= MAXLINES[role]) break;
+      if (fs <= 22) break;            // floor: QC flags anything this small
+      fs -= 2; el.style.fontSize = fs + 'px';
+    }
+  }
+}
+window.seek = (t) => {
+  const c = document.getElementById('c').getContext('2d');
+  const night = lerpKeys(SB.light, t);
+  // lapis / ultramarine flat sky
+  const sky = c.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#132A6E'); sky.addColorStop(.55,'#22379A'); sky.addColorStop(1,'#1A2C78');
+  c.fillStyle = sky; c.fillRect(0,0,W,H);
+  // the light source (sun / lamp) rises as hardship lifts — gold disc with rays and vermilion pearl ring
+  const sunY = 1720 - 1380*ease(t/SB.duration), sunX = 880;
+  for (let k=0;k<24;k++){ const a=k/24*6.283+t*.05, L=(k%2?150:210)+10*Math.sin(t*2+k);
+    c.strokeStyle=`rgba(233,196,106,${.55-.35*night})`; c.lineWidth=k%2?4:7; c.beginPath();
+    c.moveTo(sunX+Math.cos(a)*95,sunY+Math.sin(a)*95); c.lineTo(sunX+Math.cos(a)*L,sunY+Math.sin(a)*L); c.stroke(); }
+  c.fillStyle='#C8321F'; c.beginPath(); c.arc(sunX,sunY,98,0,6.283); c.fill();
+  c.fillStyle='rgba(251,246,234,.9)'; for(let k=0;k<28;k++){const a=k/28*6.283;c.beginPath();c.arc(sunX+Math.cos(a)*98,sunY+Math.sin(a)*98,4,0,6.283);c.fill()}
+  const sg=c.createRadialGradient(sunX-25,sunY-25,10,sunX,sunY,88); sg.addColorStop(0,'#FFF1B8'); sg.addColorStop(.6,'#E9C46A'); sg.addColorStop(1,'#A8741F');
+  c.fillStyle=sg; c.beginPath(); c.arc(sunX,sunY,86,0,6.283); c.fill();
+  // white-lead dot triads
+  c.fillStyle='rgba(251,246,234,.7)';
+  for (const d of dots){ const a=.35+.35*Math.sin(d.ph+t*1.1); c.globalAlpha=a; for(const [dx,dy] of [[0,0],[7,4],[-7,4]]){c.beginPath();c.arc(d.x+dx,d.y+dy,2.4,0,6.283);c.fill()} }
+  c.globalAlpha=1;
+  // gold stars: only gold answers light — a raking band sweeps, plus nearness to the sun
+  const band = -300 + ((t*95) % 1700);
+  for (const s of stars){
+    const bandGlow = Math.max(0, 1 - Math.abs((s.x + s.y*.35) - band)/170);
+    const sunGlow = Math.max(0, 1 - Math.hypot(s.x-sunX, s.y-sunY)/700);
+    star(c, s.x, s.y + Math.sin(t*.4+s.ph)*3, s.s, s.rot + t*.02, s.eight, Math.min(1, .25*(1-night) + bandGlow*.9 + sunGlow*.6 + .15*Math.sin(s.ph+t*2)));
+  }
+  // opening: frame 1 sits inside one gold khatam at ~×20, pulling back by 2.5 s (FavStash first-3-seconds rule)
+  if (t < 3.2) { const z = 1 + 19*Math.pow(1-ease(t/2.6),2.2); c.globalAlpha = 1 - ease((t-2.4)/0.8);
+    star(c, 540, 860, 230*z, t*.15, true, .8); c.globalAlpha = 1; }
+  // night is a state, not a palette: multiply the painting by a cool blue-grey
+  c.globalCompositeOperation='multiply'; c.fillStyle=`rgba(${Math.round(255-170*night)},${Math.round(255-160*night)},${Math.round(255-110*night)},1)`; c.fillRect(0,0,W,H);
+  c.globalAlpha=.14; c.drawImage(grain,0,0); c.globalAlpha=1; c.globalCompositeOperation='source-over';
+  border(c, t);
+  const vg=c.createRadialGradient(540,960,600,540,960,1250); vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,`rgba(8,14,40,${.30+.1*night})`);
+  c.fillStyle=vg; c.fillRect(0,0,W,H);
+  // text layers
+  for (const el of document.querySelectorAll('.seg')) {
+    const a=+el.dataset.start, b=+el.dataset.end;
+    const o = Math.min(ease((t-a)/0.7), ease((b-t)/0.55));
+    el.style.opacity = o; el.style.transform = `translateY(${(1-ease((t-a)/0.9))*26}px)`;
+  }
+  const ta = SB.segments.find(s=>s.id==='trans_ta');
+  document.getElementById('g-trans').style.opacity = Math.min(ease((t-ta.start+0.2)/0.6), ease((ta.end-t)/0.5));
+};
+window.renderedTexts = () => Object.fromEntries([...document.querySelectorAll('.seg')].map(e => [e.dataset.id, e.textContent]));
+window.layoutReport = () => [...document.querySelectorAll('.seg')].map(e => { const r=e.getBoundingClientRect(); return {id:e.dataset.id, top:r.top, bottom:r.bottom, left:r.left, right:r.right, overflowX: e.scrollWidth > e.clientWidth + 1, fontPx: parseFloat(getComputedStyle(e).fontSize)}; });
+</script></body></html>

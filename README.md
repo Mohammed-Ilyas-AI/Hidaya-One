@@ -108,3 +108,24 @@ This initial TypeScript port uses ADK `LlmAgent` sub-agent delegation, matching 
 8. Add Cloud Scheduler after an authenticated production endpoint exists.
 
 Do not deploy publicly or enable publishing from this starter.
+
+## Production pipeline (TypeScript, 9 agents) — `src/`
+
+```bash
+npm run produce -- --topic sabr     # research → verify → script → storyboard → render → narrate → edit → QC → metadata
+npm test                            # offline gate tests (no network, no paid calls)
+```
+
+| # | Agent | File | Live Gemini use | Deterministic gate |
+|---|---|---|---|---|
+| 1 | Orchestrator | `src/run.ts` | — | stops on BLOCKED, HOLD on any QC FAIL |
+| 2 | Islamic research | `src/agents/research.ts` | suggests extra ayat (saved for reviewer only) | only APPROVED refs from `registry/topics.json`; text from alquran.cloud, cross-source Tanzil, recitation from EveryAyah |
+| 3 | Verification | `src/agents/verification.ts` | AI reviewer (context/appropriateness) | two-source Arabic equality, hash integrity, script checks |
+| 4 | Tamil script | `src/agents/script.ts` | writes the hook (Tamil + English) | no Arabic, no quotes, length limit; template fallback |
+| 5 | Creative producer | `src/agents/creative.ts` | — | every on-screen word tagged with its origin |
+| 6 | Video generator | `src/agents/render.ts` + `src/composition/gilded.html` | — (Veo/Omni off) | deterministic HTML → Chromium → FFmpeg; FavStash "Gilded Illumination" look, aniconic |
+| 7 | Video editor | `src/agents/editor.ts` | Gemini TTS narration slot | recitation untouched; ambient bed ducks; −14 LUFS |
+| 8 | Quality control | `src/agents/qc.ts`, `src/qc/glyph_coverage.py` | multimodal review slot | Viprasol-style script + glyph coverage, verbatim-source, overflow/overlap/safe-area/min-font, loudness, format, black frames |
+| 9 | Channel manager | `src/agents/channel.ts` | — | YouTube metadata, `privacyStatus: private` always explicit; upload not connected |
+
+Outputs land in `out/<run-id>/` (git-ignored).
