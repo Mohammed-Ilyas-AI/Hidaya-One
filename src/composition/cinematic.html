@@ -1,0 +1,190 @@
+<!doctype html>
+<!-- Hidayah "Dawn" composition. Cinematic, aniconic, deterministic (pure function of t).
+     Background: WebGL2 shader — desert dunes, domain-warped clouds, stars, a rising sun with god rays.
+     Story for Sabr: night of hardship → dawn → sunrise as "Indeed, Allah is with the patient" is recited. -->
+<html><head><meta charset="utf-8">
+<style>
+  @font-face{font-family:"AmiriQ";src:url("file:///usr/share/fonts/opentype/fonts-hosny-amiri/AmiriQuran.ttf")}
+  @font-face{font-family:"Ruqaa";src:url("../../node_modules/@fontsource/aref-ruqaa/files/aref-ruqaa-arabic-700-normal.woff2")}
+  @font-face{font-family:"Corm";font-weight:500;src:url("../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-normal.woff2")}
+  @font-face{font-family:"Corm";font-weight:600;src:url("../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-600-normal.woff2")}
+  @font-face{font-family:"Corm";font-style:italic;font-weight:500;src:url("../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-italic.woff2")}
+  @font-face{font-family:"TamilSerif";font-weight:500;src:url("../../node_modules/@fontsource/noto-serif-tamil/files/noto-serif-tamil-tamil-500-normal.woff2")}
+  @font-face{font-family:"TamilSerif";font-weight:600;src:url("../../node_modules/@fontsource/noto-serif-tamil/files/noto-serif-tamil-tamil-600-normal.woff2")}
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#03050d}
+  #gl{position:absolute;inset:0;width:1080px;height:1920px}
+  #fx{position:absolute;inset:0}
+  #scrim{position:absolute;inset:0;pointer-events:none}
+  .group{position:absolute;left:96px;right:96px;display:flex;flex-direction:column;align-items:center}
+  .seg{position:relative;width:100%;text-align:center;opacity:0;will-change:opacity,transform,filter}
+  .g-intro{top:560px;gap:18px}
+  .g-verse{top:300px;gap:6px}
+  .g-trans{top:1010px;gap:16px}
+  .g-ref{top:1390px}
+  .g-reflect{top:500px;gap:30px}
+  .g-end{top:760px;gap:22px}
+  .title{font:700 230px/1.25 "Ruqaa";color:#F7E3A8;text-shadow:0 0 40px rgba(255,205,120,.55),0 0 90px rgba(255,170,80,.25)}
+  .orn{height:2px;width:420px;margin:6px auto;background:linear-gradient(90deg,transparent,#E9C77B,transparent);opacity:0}
+  .hook{font:600 62px/1.5 "TamilSerif";color:#FFFDF6;text-shadow:0 2px 24px rgba(0,0,0,.65)}
+  .hook2{font:italic 500 50px/1.3 "Corm";color:#E7E0F2;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+  .ar{font:400 92px/1.95 "AmiriQ";color:#FFF6DF;text-shadow:0 0 26px rgba(255,214,140,.45),0 3px 14px rgba(0,0,0,.7)}
+  .tr_ta{position:absolute;top:0;font:500 46px/1.6 "TamilSerif";color:#FFFDF6;text-shadow:0 2px 20px rgba(0,0,0,.75)}
+  .tr_en{position:absolute;top:0;font:italic 500 46px/1.35 "Corm";color:#F1E6CF;text-shadow:0 2px 18px rgba(0,0,0,.7)}
+  .ref{width:auto;font:600 30px/1 "Corm";letter-spacing:9px;color:#EBD9A6;padding:0 34px;
+       background:linear-gradient(90deg,transparent 0,#E9C77B 0) left center/26px 1px no-repeat,linear-gradient(90deg,#E9C77B,transparent) right center/26px 1px no-repeat}
+  .reflect_ar{font:400 112px/1.9 "AmiriQ";color:#FFF3D1;text-shadow:0 0 34px rgba(255,200,110,.6),0 3px 16px rgba(0,0,0,.6)}
+  .reflect_ta{font:600 54px/1.55 "TamilSerif";color:#FFFDF6;text-shadow:0 2px 22px rgba(0,0,0,.6)}
+  .reflect_en{font:italic 500 54px/1.3 "Corm";color:#FFF1D6;text-shadow:0 2px 20px rgba(0,0,0,.55)}
+  .brand{width:auto;font:600 72px/1 "Corm";letter-spacing:22px;color:#FFF4D8;padding-left:22px;text-shadow:0 0 30px rgba(255,200,120,.45)}
+  .brand_sub{font:500 32px/1.4 "Corm";letter-spacing:3px;color:#F3E6C8;text-shadow:0 2px 14px rgba(0,0,0,.6)}
+</style></head>
+<body>
+<canvas id="gl" width="720" height="1280"></canvas>
+<canvas id="fx" width="1080" height="1920"></canvas>
+<canvas id="scrim" width="1080" height="1920"></canvas>
+<div id="root"></div>
+<script id="fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform float uT, uDawn, uDur; out vec4 o;
+float h(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p,int o){float v=0.,a=.5;for(int i=0;i<6;i++){if(i>=o)break;v+=a*n(p);p=mat2(1.6,1.2,-1.2,1.6)*p;a*=.5;}return v;}
+vec3 skyCol(float y,float d){
+  vec3 nightTop=vec3(.012,.02,.07), nightHor=vec3(.06,.08,.2);
+  vec3 preTop=vec3(.07,.07,.2), preHor=vec3(.78,.42,.42);
+  vec3 sunTop=vec3(.16,.3,.55), sunHor=vec3(1.,.66,.33);
+  float a=smoothstep(0.,.5,d), b=smoothstep(.45,1.,d);
+  vec3 top=mix(mix(nightTop,preTop,a),sunTop,b), hor=mix(mix(nightHor,preHor,a),sunHor,b);
+  return mix(hor,top,pow(clamp(y,0.,1.),.55));
+}
+float ridge(float x,float base,float amp,float fr,float seed,float drift){
+  return base+amp*(.55*sin(x*fr+seed)+.3*sin(x*fr*2.3+seed*1.7)+.15*(fbm(vec2(x*fr*1.5+drift,seed),3)-.5)*2.);
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes; float asp=uRes.x/uRes.y;
+  float zoom=1.-.07*(uT/uDur);                       // slow push-in
+  vec2 q=(uv-vec2(.5,.36))*zoom+vec2(.5,.36);
+  float hor=.34;
+  vec2 sun=vec2(.64, mix(.22,.47,smoothstep(.05,1.,uDawn)));
+  float y=(q.y-hor)/(1.-hor);
+  vec3 col=skyCol(y,uDawn);
+  // sun glow & disc
+  vec2 ds=(q-sun)*vec2(asp,1.); float dsun=length(ds);
+  vec3 sunC=mix(vec3(1.,.55,.3),vec3(1.,.9,.7),uDawn);
+  col+=sunC*(.9*exp(-dsun*7.)+.35*exp(-dsun*2.2))*smoothstep(.15,.6,uDawn);
+  col=mix(col,vec3(1.,.97,.88),smoothstep(.035,.03,dsun)*smoothstep(.3,.7,uDawn));
+  // stars (fade with dawn)
+  vec2 sp=q*vec2(asp,1.)*380.; float st=h(floor(sp)); vec2 fp=fract(sp)-.5;
+  float star=step(.9965,st)*smoothstep(.12,0.,length(fp))*(.6+.4*sin(uT*2.+st*90.));
+  col+=vec3(.9,.92,1.)*star*(1.-smoothstep(.15,.55,uDawn))*smoothstep(.0,.25,y);
+  // clouds: domain-warped fbm in a band above the horizon, drifting; lit from the sun at dawn
+  vec2 cp=vec2(q.x*asp*2.2+uT*.018,q.y*5.5);
+  vec2 w=vec2(fbm(cp+vec2(0.,uT*.01),4),fbm(cp+vec2(5.2,1.3),4));
+  float cd=fbm(cp+2.2*w,6);
+  float band=smoothstep(.36,.5,q.y)*smoothstep(.98,.62,q.y);
+  float c=smoothstep(.48,.78,cd)*band;
+  float lit=clamp(1.-length((q-sun)*vec2(asp,1.))*1.6,0.,1.);
+  vec3 cloudDark=mix(vec3(.03,.04,.1),vec3(.25,.16,.28),smoothstep(.2,.7,uDawn));
+  vec3 cloudLit=mix(vec3(.2,.22,.38),vec3(1.,.72,.45),smoothstep(.25,.9,uDawn));
+  vec3 cc=mix(cloudDark,cloudLit,clamp(.25+lit*1.3*(cd-.4)*2.,0.,1.));
+  col=mix(col,cc,c*.92);
+  // god rays: march toward the sun, accumulating unoccluded light
+  float rays=0.; vec2 dir=(sun-q)/10.; vec2 rp=q;
+  for(int i=0;i<10;i++){rp+=dir; vec2 rc=vec2(rp.x*asp*2.2+uT*.018,rp.y*5.5);
+    float occ=smoothstep(.48,.78,fbm(rc,3))*smoothstep(.36,.5,rp.y)*smoothstep(.98,.62,rp.y); rays+=(1.-occ);}
+  rays/=10.; col+=sunC*pow(rays,3.)*exp(-dsun*2.5)*.55*smoothstep(.3,.85,uDawn)*step(hor,q.y);
+  // dunes: three parallax ridges, rim-lit by the low sun
+  float drift=uT*.004;
+  for(int L=0;L<3;L++){
+    float fl=float(L);
+    float r=ridge(q.x*asp+drift*(fl+1.),hor-.02-fl*.085,.03+fl*.018,3.2-fl*.7,fl*3.1+1.,fl);
+    float m=smoothstep(r+.002,r-.002,q.y);
+    vec3 dn=mix(vec3(.02,.02,.05),vec3(.32,.17,.12),smoothstep(.2,1.,uDawn))*(1.-fl*.28);
+    dn+=sunC*.35*smoothstep(.02,0.,r-q.y)*smoothstep(.3,1.,uDawn)*(1.-fl*.3);       // rim light on crests
+    dn*=.85+.15*fbm(vec2(q.x*asp*40.,q.y*90.),2);                                    // sand texture
+    col=mix(col,dn,m);
+  }
+  // haze near horizon, grade, vignette
+  col+=vec3(1.,.6,.4)*.12*exp(-abs(q.y-hor)*18.)*smoothstep(.2,.8,uDawn);
+  col=pow(col,vec3(.92)); col=col/(col+.85)*1.75;
+  vec2 v=uv-.5; col*=1.-.55*dot(v*vec2(1.,.8),v*vec2(1.,.8))*1.6;
+  o=vec4(col,1.);
+}
+</script>
+<script>
+let SB, gl, prog, U = {}, motes = [];
+const W = 1080, H = 1920;
+function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}}
+const ease = x => x<0?0:x>1?1:x*x*(3-2*x);
+function dawnAt(t){ const k=SB.light; for(let i=1;i<k.length;i++) if(t<=k[i].t){const a=k[i-1],b=k[i];return (1-a.night)+((1-b.night)-(1-a.night))*ease((t-a.t)/(b.t-a.t));} return 1-k[k.length-1].night; }
+
+function initGL(){
+  const c=document.getElementById('gl'); gl=c.getContext('webgl2',{preserveDrawingBuffer:true});
+  const vs=`#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0,1);}`;
+  const mk=(t,s)=>{const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));return sh};
+  prog=gl.createProgram(); gl.attachShader(prog,mk(gl.VERTEX_SHADER,vs)); gl.attachShader(prog,mk(gl.FRAGMENT_SHADER,document.getElementById('fs').textContent.trim()));
+  gl.linkProgram(prog); gl.useProgram(prog);
+  const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const l=gl.getAttribLocation(prog,'p'); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l,2,gl.FLOAT,false,0,0);
+  for(const n of ['uRes','uT','uDawn','uDur']) U[n]=gl.getUniformLocation(prog,n);
+  gl.uniform2f(U.uRes,c.width,c.height);
+}
+
+window.setup = (sb) => {
+  SB = sb; initGL(); const r = rng(2153);
+  for (let i=0;i<90;i++) motes.push({x:r()*W,y:r()*H,s:1+r()*3.2,v:6+r()*16,ph:r()*6.28,b:r()<.18});
+  const groups={}, root=document.getElementById('root');
+  for (const g of ['intro','verse','trans','ref','reflect','end']) { const d=document.createElement('div'); d.className='group g-'+g; d.id='g-'+g; root.appendChild(d); groups[g]=d; }
+  for (const s of SB.segments) {
+    const el=document.createElement('div'); el.className='seg '+s.role; el.lang=s.lang; el.dir=s.dir; el.dataset.id=s.id;
+    el.textContent=s.text; el.dataset.start=s.start; el.dataset.end=s.end; el.dataset.dim=s.dimAt ?? '';
+    if (s.role==='hook') { const o=document.createElement('div'); o.className='orn'; o.dataset.start=s.start; o.dataset.end=s.end; groups.intro.appendChild(o); }
+    groups[s.group].appendChild(el);
+  }
+  return document.fonts.ready.then(()=>{ fitAll(); stackTranslations(); return true; });
+};
+const MAXLINES={title:1,hook:2,hook2:2,ar:2,tr_ta:3,tr_en:3,ref:1,reflect_ar:2,reflect_ta:3,reflect_en:2,brand:1,brand_sub:2};
+function fitAll(){
+  for (const el of document.querySelectorAll('.seg')) {
+    const role=[...el.classList].find(c=>MAXLINES[c]); let fs=parseFloat(getComputedStyle(el).fontSize);
+    for (let i=0;i<40;i++){ const cs=getComputedStyle(el); const lh=parseFloat(cs.lineHeight)||fs*1.4;
+      const lines=Math.round((el.scrollHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom))/lh);
+      if (el.scrollWidth<=el.clientWidth+1 && lines<=MAXLINES[role]) break; if (fs<=24) break; fs-=2; el.style.fontSize=fs+'px'; }
+  }
+}
+// Tamil above English for the same phrase; each pair occupies the same slot and cross-fades
+function stackTranslations(){
+  for (const ta of document.querySelectorAll('.tr_ta')) {
+    const en=document.querySelector(`.tr_en[data-start="${ta.dataset.start}"]`) || [...document.querySelectorAll('.tr_en')].find(e=>Math.abs(+e.dataset.start-+ta.dataset.start)<1.2);
+    if (en) en.style.top=(ta.offsetHeight+14)+'px';
+  }
+}
+
+window.seek = (t) => {
+  const dawn=dawnAt(t);
+  gl.uniform1f(U.uT,t); gl.uniform1f(U.uDawn,dawn); gl.uniform1f(U.uDur,SB.duration); gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  // golden dust motes drifting upward, a few soft bokeh
+  const fx=document.getElementById('fx').getContext('2d'); fx.clearRect(0,0,W,H);
+  for (const m of motes){ const y=((m.y - t*m.v) % H + H) % H, x=m.x+Math.sin(t*.6+m.ph)*14;
+    const a=(.25+.35*Math.sin(t*1.3+m.ph))*(.35+.65*dawn);
+    if (m.b){ const g=fx.createRadialGradient(x,y,0,x,y,m.s*9); g.addColorStop(0,`rgba(255,214,150,${a*.35})`); g.addColorStop(1,'rgba(255,214,150,0)'); fx.fillStyle=g; fx.beginPath(); fx.arc(x,y,m.s*9,0,6.283); fx.fill(); }
+    else { fx.fillStyle=`rgba(255,228,170,${a})`; fx.beginPath(); fx.arc(x,y,m.s,0,6.283); fx.fill(); } }
+  // readability scrim behind the active text zone (soft, no boxes)
+  const sc=document.getElementById('scrim').getContext('2d'); sc.clearRect(0,0,W,H);
+  const cy = t<SB.recitationStart?900 : t<SB.reflectStart?860 : t<SB.endStart?760:860;
+  const g=sc.createRadialGradient(540,cy,80,540,cy,820); g.addColorStop(0,'rgba(2,4,14,.42)'); g.addColorStop(1,'rgba(2,4,14,0)'); sc.fillStyle=g; sc.fillRect(0,0,W,H);
+  for (const el of document.querySelectorAll('.seg,.orn')) {
+    const a=+el.dataset.start, b=+el.dataset.end, dim=el.dataset.dim===''||el.dataset.dim===undefined?NaN:+el.dataset.dim;
+    let o=Math.min(ease((t-a)/0.8), ease((b-t)/0.6));
+    if (!isNaN(dim) && t>dim) o*=1-.55*ease((t-dim)/0.6);          // earlier phrases recede
+    el.style.opacity=o;
+    const k=ease((t-a)/1.0);
+    el.style.transform=`translateY(${(1-k)*22}px) scale(${.985+.015*k})`;
+    el.style.filter=`blur(${(1-ease((t-a)/0.7))*10}px)`;
+    if (el.classList.contains('orn')) { el.style.width=(420*ease((t-a-.3)/1.2))+'px'; }
+  }
+};
+window.renderedTexts = () => Object.fromEntries([...document.querySelectorAll('.seg')].map(e=>[e.dataset.id,e.textContent]));
+window.layoutReport = () => [...document.querySelectorAll('.seg')].map(e=>{const r=e.getBoundingClientRect();return{id:e.dataset.id,top:r.top,bottom:r.bottom,left:r.left,right:r.right,overflowX:e.scrollWidth>e.clientWidth+1,fontPx:parseFloat(getComputedStyle(e).fontSize)}});
+</script></body></html>
