@@ -1,0 +1,13 @@
+{
+  "id": "spike-render-test-001",
+  "note": "RENDER TEST ONLY - no religious content, not for publication. In production every text string comes from the approved source registry, never from a model.",
+  "width": 1080, "height": 1920, "fps": 30, "duration": 15,
+  "segments": [
+    { "start": 0.3, "end": 4.6,  "lang": "en", "dir": "ltr", "role": "hook",    "text": "Rendering test: Arabic, Tamil and English" },
+    { "start": 4.4, "end": 10.2, "lang": "ar", "dir": "rtl", "role": "arabic",  "text": "ٱلسَّلَامُ عَلَيْكُمْ" },
+    { "start": 5.4, "end": 10.2, "lang": "ta", "dir": "ltr", "role": "tamil",   "text": "உங்கள் மீது சாந்தி உண்டாகட்டும்" },
+    { "start": 6.4, "end": 10.2, "lang": "en", "dir": "ltr", "role": "english", "text": "Peace be upon you" },
+    { "start": 10.4, "end": 15.0, "lang": "ar", "dir": "rtl", "role": "brand",  "text": "هداية" },
+    { "start": 11.0, "end": 15.0, "lang": "en", "dir": "ltr", "role": "brandsub", "text": "HIDAYAH · test render · not for publication" }
+  ]
+}

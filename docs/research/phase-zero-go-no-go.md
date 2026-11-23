@@ -41,4 +41,7 @@ M0 (owner unblock) → M1 Foundation → M2 Source registry → M3 Content graph
 ## Update 2026-11-23 — VEED
 Founder directed VEED for video creation. VEED key verified (free probe). VEED provides a talking presenter (Fabric 1.0, $0.15/s @720p) but no scene generation or subtitles, so it complements rather than replaces scenery + renderer. New owner decisions: **avatar image** (founder photo with consent / owned illustrated character / none) and **presenter seconds per Short** (recommend ~5 s → ≈$22.50/month). See `veed-api-evaluation.md`.
 
+## Update 2026-11-23 — open-source video skills
+Reviewed four skill packs; adopted the HTML/Chromium + FFmpeg rendering pattern after a working spike (Arabic + Tamil verified, byte-exact text QC, 24 s per 15 s Short). Default production becomes deterministic animation at ≈ **$23/month** for 30 Shorts; VEED/Omni optional. See `open-source-video-skills-evaluation.md` and ADR-012.
+
 **STOPPED. Awaiting explicit approval before any paid call, API enablement, IAM/OAuth change, deployment or upload.**

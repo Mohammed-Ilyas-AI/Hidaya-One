@@ -73,3 +73,8 @@ flowchart TD
 - **Deviation from blueprint:** VEED is a non-Google hosted service; the blueprint's "Google-only hosted services" rule is relaxed for this adapter by founder decision. Data sent: TTS audio + avatar image only.
 - **Guardrails:** avatar must be founder (with consent) or an owned non-photoreal character; no prophets/companions/real scholars; no lip-synced Qur'anic recitation; VEED spend tracked by the same ledger reservation (VEED has prepaid credits — top-up amount acts as an external hard cap).
 - **Secret handling:** key held as an environment network secret / Secret Manager in production; never in code, logs or chat.
+
+## ADR-012 Deterministic HTML/Chromium motion graphics as the primary visual (2026-11-23)
+- **Context:** Reviewed FavStash, Viprasol, Melvynx and video-explainer skills (`docs/research/open-source-video-skills-evaluation.md`). Spike `spikes/html-renderer/` proved headless Arabic (RTL, tashkeel) and Tamil rendering, byte-exact text QC and a 24 s render time for a 15 s 1080×1920 Short.
+- **Decision:** The renderer (Cloud Run Job) composites an HTML/GSAP-style composition rendered by headless Chromium, then encodes it with FFmpeg. This supersedes FFmpeg `drawtext` for text in ADR-007. Motion graphics become the default visual. VEED Fabric (ADR-011) and Omni (ADR-002) are optional premium layers. HyperFrames (Apache-2.0) to be evaluated in M4. Viprasol-style QC (script/glyph/shaping checks) is added to the QC stage.
+- **Rejected:** Melvynx engine (prebuilt macOS binaries, camera-first, third-party publishing); Kokoro/Chatterbox as launch TTS (no Tamil/Arabic; archived/watermarked); running Claude Code skills as the production pipeline (blueprint: Claude Code is dev-only).
