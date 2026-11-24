@@ -2,6 +2,8 @@
 // Rules: always privacyStatus "private" (API default is PUBLIC since 2026-11-02); optional publishAt schedule;
 // never upload the same Short twice (local ledger + a hidden tag checked on the channel before every upload).
 import { readFileSync, existsSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
 
 const OAUTH = "https://oauth2.googleapis.com/token";
 const API = "https://www.googleapis.com/youtube/v3";
@@ -10,9 +12,21 @@ const LEDGER = "registry/published.json";
 
 export interface YouTubeCreds { clientId: string; clientSecret: string; refreshToken: string }
 
+/** DRAFT_ONLY (default): never upload. PRIVATE_UPLOAD: upload as private (optionally scheduled). Nothing else exists. */
+export function publishMode(): "DRAFT_ONLY" | "PRIVATE_UPLOAD" {
+  return process.env.HIDAYAH_PUBLISH_MODE === "PRIVATE_UPLOAD" ? "PRIVATE_UPLOAD" : "DRAFT_ONLY";
+}
+
+/** Credentials from env vars, else from the token file written by scripts/youtube-auth.mjs (secret read from the client file). */
 export function credsFromEnv(): YouTubeCreds | null {
   const { YOUTUBE_CLIENT_ID: clientId, YOUTUBE_CLIENT_SECRET: clientSecret, YOUTUBE_REFRESH_TOKEN: refreshToken } = process.env;
-  return clientId && clientSecret && refreshToken ? { clientId, clientSecret, refreshToken } : null;
+  if (clientId && clientSecret && refreshToken) return { clientId, clientSecret, refreshToken };
+  const file = process.env.HIDAYAH_YOUTUBE_TOKEN_FILE ?? path.join(process.env.HIDAYAH_HOME ?? path.join(homedir(), ".hidayah"), "youtube-token.json");
+  if (!existsSync(file)) return null;
+  const t = JSON.parse(readFileSync(file, "utf8"));
+  if (!t.refresh_token || !t.client_secret_file || !existsSync(t.client_secret_file)) return null;
+  const c = JSON.parse(readFileSync(t.client_secret_file, "utf8")).installed;
+  return c?.client_secret ? { clientId: t.client_id, clientSecret: c.client_secret, refreshToken: t.refresh_token } : null;
 }
 
 async function accessToken(c: YouTubeCreds): Promise<string> {
@@ -41,8 +55,9 @@ async function alreadyOnChannel(token: string, tag: string): Promise<string | nu
 }
 
 export async function publishPrivate(shortId: string, file: string, metadata: any, opts: { publishAt?: string } = {}) {
+  if (publishMode() === "DRAFT_ONLY") return { status: "DRAFT_ONLY" as const, detail: "upload disabled (HIDAYAH_PUBLISH_MODE is not PRIVATE_UPLOAD)" };
   const creds = credsFromEnv();
-  if (!creds) return { status: "NOT_CONNECTED" as const, detail: "YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET / YOUTUBE_REFRESH_TOKEN not set" };
+  if (!creds) return { status: "NOT_CONNECTED" as const, detail: "no YouTube credentials (run scripts/youtube-auth.mjs)" };
   const done = ledger()[shortId];
   if (done) return { status: "ALREADY_UPLOADED" as const, videoId: done.videoId };
   const token = await accessToken(creds);

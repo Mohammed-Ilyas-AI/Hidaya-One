@@ -24,3 +24,9 @@ out/
 library/footage/
 # generated per-Short HyperFrames projects (reproducible with npm run produce)
 studio/hidayah-*/
+
+# OAuth client secrets and tokens — never commit
+client_secret*.json
+*client_secret*.json
+youtube-token*.json
+.hidayah/

@@ -26,33 +26,35 @@ Do this signed in to Google Cloud Console with the account that owns project **e
 2. **Application type:** **Desktop app** · **Name:** `hidayah-desktop` → **Create**.
 3. In the dialog click **Download JSON** (file name like `client_secret_XXXX.json`). Keep it private.
 
-## 4. Open Cloud Shell and get the sign-in script
-1. Click the **>_** (Activate Cloud Shell) icon at the top right of the Console.
-2. In Cloud Shell: **⋮ → Upload** → choose the `client_secret_XXXX.json` you downloaded.
-3. Run:
-   ```bash
-   git clone https://github.com/Mohammed-Ilyas-AI/Hidaya-One.git && cd Hidaya-One && git checkout ccr-d1d7aea4-2cxbd2
-   node scripts/youtube-auth.mjs ~/client_secret_*.json
-   ```
+## 4. Sign in — on YOUR computer (Windows PowerShell), not Cloud Shell
+The sign-in uses a loopback callback: Google sends your browser to `http://127.0.0.1:<port>`, which is **the computer
+running the browser**. So the script must run on that same computer. (Running it in Cloud Shell, SSH or a cloud
+container is why the earlier attempt showed `ERR_CONNECTION_REFUSED` — and the old script had no listener at all.)
 
-## 5. Sign in as the channel owner
-1. Open the link the script prints, choose the **account that owns the YouTube channel**, pick the
-   **Hidayah channel** if asked (brand accounts appear as a separate choice), and click **Allow**.
-2. The browser lands on `http://127.0.0.1:8765/?code=…` and says *"This site can't be reached"* — expected.
-3. Copy that whole address and paste it into the **Cloud Shell terminal** (not into the chat).
-4. The script prints `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`.
+Needs Node.js 18+ (`node --version`; install from https://nodejs.org if missing) and the repo:
+```powershell
+git clone https://github.com/Mohammed-Ilyas-AI/Hidaya-One.git
+cd Hidaya-One
+git checkout ccr-d1d7aea4-2cxbd2
+node scripts/youtube-auth.mjs --client "$HOME\Downloads\client_secret_949220497714-0rf236asgeec867se3ov23k67gi5buqd.apps.googleusercontent.com.json"
+```
+The script:
+1. starts a listener on `127.0.0.1` with a free port and confirms it is listening,
+2. opens your browser — sign in as the **YouTube channel owner**, pick the Hidayah channel, **Allow**
+   ("Google hasn't verified this app" → **Advanced → Go to …** is expected for your own tool),
+3. the tab says **"Hidaya One is signed in ✔"**,
+4. checks access **read-only** (prints your channel name), and saves the refresh token to
+   `%USERPROFILE%\.hidayah\youtube-token.json` (an existing file is never overwritten; a dated copy is made instead).
+No code, token or secret is printed. Nothing is uploaded. If Windows Firewall asks about Node.js, **Allow on private networks**
+is not required — the listener only accepts 127.0.0.1 — you can click Cancel.
 
-## 6. Give the values to the Hidayah environment — never through chat
-In Claude Code on the web: the environment menu in the session title bar → **Edit** →
-**Environment variables** → add the three lines exactly as printed:
-```
-YOUTUBE_CLIENT_ID=...
-YOUTUBE_CLIENT_SECRET=...
-YOUTUBE_REFRESH_TOKEN=...
-```
-Then start a new session (variables load at start). Tell me "YouTube connected" and I will:
-allow `oauth2.googleapis.com` and `www.googleapis.com` on the network (you approve), run a
-read-only check (channel name only), then upload the first Short as **private** for your review.
+## 5. Publishing stays off (DRAFT_ONLY)
+The publisher refuses to upload unless `HIDAYAH_PUBLISH_MODE=PRIVATE_UPLOAD` is set. Even then it uploads **private** only.
+
+## 6. Using the token from the cloud pipeline (later, when you decide)
+Open `%USERPROFILE%\.hidayah\youtube-token.json` in Notepad and copy `refresh_token`; take `client_id` and
+`client_secret` from your client JSON. Add them in the environment's settings (session title bar → environment → Edit →
+Environment variables) as `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN` — never in chat.
 
 **Security notes.** These three values let a program upload to your channel; anyone with access to this
 environment's settings can read environment variables. Revoke any time at https://myaccount.google.com/permissions
