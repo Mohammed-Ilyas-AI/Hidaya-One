@@ -8,6 +8,16 @@ import { scriptsOf } from "../lib/util.ts";
 import type { RenderResult } from "./render.ts";
 import type { RunContext } from "./context.ts";
 
+/**
+ * Python for the glyph check (needs fontTools). HIDAYAH_PYTHON overrides (space-separated command).
+ * Default: python3 on Linux/macOS (the Cloud Run image installs fonttools); on Windows, uv supplies fontTools.
+ */
+const PY: string[] = process.env.HIDAYAH_PYTHON
+  ? process.env.HIDAYAH_PYTHON.split(" ")
+  : process.platform === "win32"
+    ? ["uv", "run", "--no-project", "--quiet", "--with", "fonttools[woff]", "python"]
+    : ["python3"];
+
 const FONT: Record<string, string> = {
   ar: "/usr/share/fonts/opentype/fonts-hosny-amiri/AmiriQuran.ttf",
   ta: "/usr/share/fonts/truetype/noto/NotoSansTamil-Regular.ttf",
@@ -94,7 +104,7 @@ export function glyphChecks(ctx: RunContext, sb: Storyboard): Check[] {
   const items = sb.segments.map((s) => ({ id: s.id, font: FONT[s.lang], text: s.text }));
   const f = path.join(ctx.outDir, "glyph-items.json");
   writeFileSync(f, JSON.stringify(items));
-  const rep = JSON.parse(execFileSync("python3", ["-I", "src/qc/glyph_coverage.py", f]).toString());
+  const rep = JSON.parse(execFileSync(PY[0], [...PY.slice(1), "-I", "src/qc/glyph_coverage.py", f]).toString());
   return rep.map((r: any) => r.missing.length
     ? { id: `glyphs.${r.id}`, status: "FAIL", detail: `${r.font} missing ${r.missing.join(", ")}` }
     : { id: `glyphs.${r.id}`, status: "PASS", detail: `${r.font} covers every character` });
@@ -136,7 +146,7 @@ export function builtGlyphChecks(outDir: string, onScreen: { id: string; text: s
   const items = onScreen.map((o) => ({ id: o.id, font: HF_FONT[langOf(o.id)], text: o.text }));
   const f = path.join(outDir, "glyph-items.json");
   writeFileSync(f, JSON.stringify(items));
-  const rep = JSON.parse(execFileSync("python3", ["-I", "src/qc/glyph_coverage.py", f]).toString());
+  const rep = JSON.parse(execFileSync(PY[0], [...PY.slice(1), "-I", "src/qc/glyph_coverage.py", f]).toString());
   return rep.map((r: any) => r.missing.length
     ? { id: `glyphs.${r.id}`, status: "FAIL", detail: `${r.font} missing ${r.missing.join(", ")}` }
     : { id: `glyphs.${r.id}`, status: "PASS", detail: `${r.font} covers every character` });

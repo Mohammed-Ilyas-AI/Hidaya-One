@@ -108,9 +108,10 @@ export async function produceOne(ref: string, publishAt?: string) {
   });
   writeJson(path.join(ctx.outDir, "release.json"), "release" in rel ? rel.release : { refused: rel.refused });
   const pub = await step(ctx, "9 distributor · publish", async () => {
-    if (!("release" in rel)) return { value: { status: "HOLD", detail: rel.refused }, summary: `HOLD · ${rel.refused}` };
+    if (!("release" in rel)) return { value: { status: "HOLD", detail: rel.refused }, summary: `HOLD · ${rel.refused}`, outcome: "BLOCKED" as const };
     const r: any = await publish(id, final, md, { publishAt, release: rel.release });
-    return { value: r, summary: `${r.status}${r.videoId ? ` · https://youtu.be/${r.videoId}` : ""}${r.detail ? ` · ${r.detail}` : ""}` };
+    const outcome = ["HOLD", "PAUSED", "DRAFT_ONLY", "NOT_CONNECTED"].includes(r.status) ? ("SKIPPED" as const) : ("ACCEPTED" as const);
+    return { value: r, summary: `${r.status}${r.videoId ? ` · https://youtu.be/${r.videoId}` : ""}${r.detail ? ` · ${r.detail}` : ""}`, outcome: r.status === "HOLD" ? ("BLOCKED" as const) : outcome };
   });
   writeJson(path.join(ctx.outDir, "run-report.json"), { id, ref, finishedAt: now(), final, gate: md.hidayah.releaseGate, publish: pub, agents: ctx.logs });
   return { id, final, gate: md.hidayah.releaseGate, publish: pub };
