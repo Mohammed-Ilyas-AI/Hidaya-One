@@ -1,32 +1,24 @@
 // Agent 4 — Tamil Script: writes the editorial hook and the narration plan.
 // Scripture lines are never written here: they are referenced from verified source records.
 import type { AyahRecord } from "../types.ts";
-import { scriptsOf } from "../lib/util.ts";
-import { chat, GeminiUnavailable } from "../lib/gemini.ts";
 import type { RunContext } from "./context.ts";
+import { runSpec } from "../brain/spec.ts";
+import { scriptSpec, editorialOk as editorialRule, HOOK_TEMPLATE } from "../brain/specs.ts";
 
 export interface Script { hookTa: string; hookEn: string; author: string; narrationTa: string | null }
 
-const FALLBACK = { hookTa: "இன்றைய நினைவூட்டல்", hookEn: "Today's reminder" };
-
 /** Editorial text must not contain Arabic (no quotes from memory), quotation marks, or exceed length. */
-export function editorialOk(s: string, lang: "ta" | "en"): boolean {
-  const sc = scriptsOf(s);
-  if (sc.has("ARABIC") || /["“”«»]/.test(s) || s.length > 48) return false;
-  return lang === "ta" ? sc.has("TAMIL") : sc.has("LATIN") && !sc.has("TAMIL");
-}
+export const editorialOk = editorialRule;
 
-export async function writeScript(ctx: RunContext, rec: AyahRecord, topicEn = "patience (sabr)"): Promise<{ value: Script; summary: string; llm?: string }> {
-  try {
-    const r = await chat(ctx.textModel,
-      "You write one-line hooks for 30-second Islamic reminder Shorts. Never quote or paraphrase scripture. Output JSON {\"ta\":\"...\",\"en\":\"...\"}, each under 40 characters, a gentle question.",
-      `Topic: ${topicEn}. The verse shown after the hook is ${rec.sourceId}; its meaning (Saheeh International): "${rec.translations.find((t) => t.lang === "en")?.text}". Write a hook that makes a viewer want to hear it, without quoting it.`);
-    const j = JSON.parse(r.text.replace(/```json|```/g, ""));
-    if (editorialOk(j.ta, "ta") && editorialOk(j.en, "en"))
-      return { value: { hookTa: j.ta, hookEn: j.en, author: ctx.textModel, narrationTa: null }, summary: `hook by ${ctx.textModel}: "${j.en}"`, llm: ctx.textModel };
-    return { value: { ...FALLBACK, author: "editorial-template", narrationTa: null }, summary: "model hook rejected by editorial rules → template", llm: ctx.textModel };
-  } catch (e) {
-    const why = e instanceof GeminiUnavailable ? `unavailable (${e.status})` : "error";
-    return { value: { ...FALLBACK, author: "editorial-template", narrationTa: null }, summary: `hook from approved template: "${FALLBACK.hookEn}"`, llm: `${why} — template used` };
-  }
+/** Agent 5 · Scriptwriter: an ADK agent writes the hook under the typed spec; code checks it or uses the template. */
+export async function writeScript(ctx: RunContext, rec: AyahRecord, topicEn = "patience (sabr)", recentHooks: string[] = []): Promise<{ value: Script; summary: string; llm?: string }> {
+  const r = await runSpec(
+    scriptSpec,
+    { topic: topicEn, sourceId: rec.sourceId, meaningEn: rec.translations.find((t) => t.lang === "en")?.text ?? "", recentHooks },
+    ctx.ledger,
+  );
+  const value = { hookTa: r.value.ta, hookEn: r.value.en, author: r.source === "MODEL" ? ctx.textModel : "editorial-template", narrationTa: null };
+  return r.source === "MODEL"
+    ? { value, summary: `hook by ${ctx.textModel}: "${r.value.en}"`, llm: ctx.textModel }
+    : { value, summary: `hook from approved template: "${HOOK_TEMPLATE.en}" (${r.reason})`, llm: `${ctx.textModel} — template used` };
 }

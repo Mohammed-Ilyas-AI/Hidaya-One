@@ -10,6 +10,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from "
 import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { step, type RunContext } from "./agents/context.ts";
+import { DecisionLedger } from "./brain/decisions.ts";
 import { research } from "./agents/research.ts";
 import { verify } from "./agents/verification.ts";
 import { writeScript } from "./agents/script.ts";
@@ -51,25 +52,26 @@ export async function produceOne(ref: string, publishAt?: string) {
   const topic = reg.topics[entry.topic];
   const id = `hidayah-${entry.topic}-${ref.replace(":", "-")}`;
   const ctx: RunContext = { runId: id, topic: entry.topic, outDir: path.join(ROOT, "out", id), textModel: process.env.HIDAYA_MODEL ?? "gemini-3.8-flash",
-    ttsModel: "gemini-3.8-flash-tts", ttsVoice: "kore", logs: [] };
+    ttsModel: "gemini-3.8-flash-tts", ttsVoice: "kore", logs: [], ledger: new DecisionLedger(id, path.join(ROOT, "out", id, "decisions.jsonl")) };
   mkdirSync(ctx.outDir, { recursive: true });
   console.log(`\n━━ ${id} · ${now()}`);
 
-  const rec = await step(ctx, "2 research", () => research(ctx, ref));
+  const rec = await step(ctx, "3 researcher", () => research(ctx, ref));
   writeJson(path.join(ctx.outDir, "source-record.json"), rec);
   const R = rec.recitation!.durationSec;
   if (R > 18.6) throw new Error(`recitation ${R.toFixed(1)} s is too long for a 30 s Short`);
-  const ver = await step(ctx, "3 verification", () => verify(ctx, rec, `${topic.label_en.toLowerCase()} (${entry.topic})`));
+  const ver = await step(ctx, "4 verifier", () => verify(ctx, rec, `${topic.label_en.toLowerCase()} (${entry.topic})`));
   writeJson(path.join(ctx.outDir, "verification.json"), ver);
+  if (ver.verdict === "BLOCKED") ctx.ledger.record({ agent: "1 orchestrator", outcome: "BLOCKED", summary: "verification BLOCKED: the verse is skipped, never published", inputHash: null, evidence: ver.checks.filter((c) => c.status === "FAIL"), model: null, ms: 0 });
   if (ver.verdict === "BLOCKED") throw new Error(`verification BLOCKED — ${JSON.stringify(ver.checks.filter((c) => c.status === "FAIL"))} ${ver.aiReview.notes}`);
   if (entry.status === "PROPOSED" && ver.aiReview.status === "APPROVED") {   // record the review result (deterministic checks also passed)
     entry.status = "AI_APPROVED"; entry.aiReview = ver.aiReview.notes;
     writeFileSync(path.join(ROOT, "registry/verses.json"), JSON.stringify(reg, null, 2) + "\n");
   }
-  const sc = await step(ctx, "4 script", () => writeScript(ctx, rec, `${topic.label_en} (${entry.topic})`));
+  const sc = await step(ctx, "5 scriptwriter", () => writeScript(ctx, rec, `${topic.label_en} (${entry.topic})`));
 
   const project = path.join(ROOT, "studio", id);
-  const built = await step(ctx, "5 creative", async () => {
+  const built = await step(ctx, "6 creative", async () => {
     const phrases = planPhrases(rec.arabic.text, rec.translations.find((t) => t.lang === "ta")!.text, rec.translations.find((t) => t.lang === "en")!.text, rec.recitation!.localPath);
     const b = buildProject({ id, topicLabelAr: topic.label_ar, hookTa: sc.hookTa, hookEn: sc.hookEn, rec, phrases, moods: topic.moods }, project);
     gradeFootage(project, topic.moods, HF);
@@ -77,7 +79,7 @@ export async function produceOne(ref: string, publishAt?: string) {
     return { value: b, summary: `${phrases.length} phrase(s) at ${phrases.map((p) => p.start).join("/")} s, reflect ${b.reflect.mode}×${b.reflect.reps}, plates ${b.footage.map((f) => f.mood).join("→")}` };
   });
 
-  const checkJson = await step(ctx, "6a hyperframes check", async () => {
+  const checkJson = await step(ctx, "7 producer · hyperframes check", async () => {
     let raw = ""; try { raw = hf(project, ["check", "--json"]); } catch (e: any) { raw = String(e.stdout ?? ""); }
     const j = firstJson(raw);
     return { value: j, summary: j.ok ? "ok" : "FAILED" };
@@ -85,17 +87,18 @@ export async function produceOne(ref: string, publishAt?: string) {
   if (!checkJson.ok) throw new Error("hyperframes check failed — see studio project");
 
   const final = path.join(ctx.outDir, `${id}.mp4`);
-  await step(ctx, "6b render", async () => { hf(project, ["render", "--quality", "delivery", "-o", final]); return { value: final, summary: path.basename(final) }; });
-  await step(ctx, "7 editor (loudness)", async () => ({ value: null, summary: normalizeLoudness(final) }));
+  await step(ctx, "7 producer · render", async () => { hf(project, ["render", "--quality", "delivery", "-o", final]); return { value: final, summary: path.basename(final) }; });
+  await step(ctx, "7 producer · loudness", async () => ({ value: null, summary: normalizeLoudness(final) }));
 
-  const qc = await step(ctx, "8 quality-control", async () => {
+  const qc = await step(ctx, "8 qa", async () => {
     const checks = [...builtTextChecks(built.onScreen, rec), ...builtGlyphChecks(ctx.outDir, built.onScreen), ...hfCheckToChecks(checkJson),
       ...mediaChecks(final, { duration: T.DURATION, recitationStart: T.HOOK })];
     return { value: checks, summary: `${checks.filter((c) => c.status === "PASS").length}/${checks.length} PASS, ${checks.filter((c) => c.status === "FAIL").length} FAIL, ${checks.filter((c) => c.status === "WARN").length} WARN` };
   });
   writeJson(path.join(ctx.outDir, "qc.json"), qc);
-  const md = await step(ctx, "9 channel", () => channelManager(ctx, rec, sc, ver, qc, topic.label_en));
+  const md = await step(ctx, "9 distributor · metadata", () => channelManager(ctx, rec, sc, ver, qc, topic.label_en));
   writeJson(path.join(ctx.outDir, "youtube-metadata.json"), md);
+  if (md.hidayah.releaseGate === "HOLD") ctx.ledger.record({ agent: "1 orchestrator", outcome: "BLOCKED", summary: "release gate HOLD (QC): not published", inputHash: null, evidence: null, model: null, ms: 0 });
   if (md.hidayah.releaseGate === "HOLD") { console.log("⚠ HOLD — QC failed, not uploading"); return { id, final, gate: "HOLD" }; }
 
   // Release approval, issued by code only when every gate passed and bound to this exact render.
@@ -104,7 +107,7 @@ export async function produceOne(ref: string, publishAt?: string) {
     channelId: process.env.HIDAYAH_YOUTUBE_CHANNEL_ID, mode: publishMode(), publishAt,
   });
   writeJson(path.join(ctx.outDir, "release.json"), "release" in rel ? rel.release : { refused: rel.refused });
-  const pub = await step(ctx, "10 youtube", async () => {
+  const pub = await step(ctx, "9 distributor · publish", async () => {
     if (!("release" in rel)) return { value: { status: "HOLD", detail: rel.refused }, summary: `HOLD · ${rel.refused}` };
     const r: any = await publish(id, final, md, { publishAt, release: rel.release });
     return { value: r, summary: `${r.status}${r.videoId ? ` · https://youtu.be/${r.videoId}` : ""}${r.detail ? ` · ${r.detail}` : ""}` };

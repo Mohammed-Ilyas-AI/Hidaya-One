@@ -1,6 +1,7 @@
 // Agent 1 — Orchestrator: runs the 9-agent production graph with hard gates.
 //   research → verification ─(BLOCKED → stop)→ script → creative → render → narration → editor → QC ─(FAIL → HOLD)→ channel
 // Usage: node --experimental-strip-types src/run.ts --topic sabr
+import { DecisionLedger } from "./brain/decisions.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { step, type RunContext } from "./agents/context.ts";
@@ -23,6 +24,7 @@ const ctx: RunContext = {
   textModel: process.env.HIDAYA_MODEL ?? "gemini-3.8-flash",
   ttsModel: process.env.HIDAYA_TTS_MODEL ?? "gemini-3.8-flash-tts", ttsVoice: process.env.HIDAYA_TTS_VOICE ?? "kore",
   logs: [],
+  ledger: new DecisionLedger("legacy", null),
 };
 mkdirSync(ctx.outDir, { recursive: true });
 console.log(`HIDAYAH orchestrator · run ${runId} · ${now()}`);

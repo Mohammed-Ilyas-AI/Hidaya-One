@@ -8,10 +8,11 @@ import { textChecks } from "../src/agents/qc.ts";
 import { buildStoryboard } from "../src/agents/creative.ts";
 import { stripPauseMarks, sha256 } from "../src/lib/util.ts";
 import type { AyahRecord } from "../src/types.ts";
+import { DecisionLedger } from "../src/brain/decisions.ts";
 
 const fixture = (): AyahRecord => JSON.parse(readFileSync("tests/fixtures/quran-2-153.json", "utf8"));
 const verdict = (r: AyahRecord) => deterministicChecks(r).some((c) => c.status === "FAIL") ? "BLOCKED" : "VERIFIED";
-const ctx = { runId: "t", topic: "sabr", outDir: "/tmp", textModel: "x", ttsModel: "x", ttsVoice: "x", logs: [] };
+const ctx = { runId: "t", topic: "sabr", outDir: "/tmp", textModel: "x", ttsModel: "x", ttsVoice: "x", logs: [], ledger: new DecisionLedger("test", null) };
 
 test("real 2:153 from two sources verifies (pause marks only differ)", () => assert.equal(verdict(fixture()), "VERIFIED"));
 

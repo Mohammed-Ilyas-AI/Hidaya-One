@@ -1,7 +1,8 @@
 // Agent 3 — Verification: deterministic checks decide; the Gemini reviewer can only add concerns.
 import type { AyahRecord, Check, VerificationReport } from "../types.ts";
 import { stripPauseMarks, scriptsOf, sha256 } from "../lib/util.ts";
-import { chat, GeminiUnavailable } from "../lib/gemini.ts";
+import { runSpec } from "../brain/spec.ts";
+import { contextReviewSpec } from "../brain/specs.ts";
 import type { RunContext } from "./context.ts";
 
 export function deterministicChecks(rec: AyahRecord): Check[] {
@@ -34,16 +35,10 @@ export function deterministicChecks(rec: AyahRecord): Check[] {
 
 export async function verify(ctx: RunContext, rec: AyahRecord, topicEn = "patience (sabr)"): Promise<{ value: VerificationReport; summary: string; llm?: string }> {
   const checks = deterministicChecks(rec);
-  let aiReview: VerificationReport["aiReview"];
-  try {
-    const r = await chat(ctx.textModel,
-      "You are a careful Islamic studies reviewer. Answer in JSON {\"status\":\"APPROVED\"|\"CONCERNS\",\"notes\":\"...\"}. Do not quote scripture from memory.",
-      `Is it appropriate and in-context to present Qur'an ${rec.sourceId} as a general reminder about ${topicEn} in a 30-second video, quoting the full verse with this translation? Translation (en): ${rec.translations.find(t => t.lang === "en")?.text}`);
-    const j = JSON.parse(r.text.replace(/```json|```/g, ""));
-    aiReview = { status: j.status === "APPROVED" ? "APPROVED" : "CONCERNS", model: ctx.textModel, notes: j.notes ?? "" };
-  } catch (e) {
-    aiReview = { status: "UNAVAILABLE", notes: e instanceof GeminiUnavailable ? `Gemini ${e.status}: ${e.message}` : String(e) };
-  }
+  // Context review by an ADK agent under a typed spec. It can only block (CONCERNS); it never passes anything.
+  const r = await runSpec(contextReviewSpec, { sourceId: rec.sourceId, topic: topicEn, translationEn: rec.translations.find((t) => t.lang === "en")?.text ?? "" }, ctx.ledger);
+  const aiReview: VerificationReport["aiReview"] =
+    r.value.status === "UNAVAILABLE" ? { status: "UNAVAILABLE", notes: `${r.value.notes} (${r.reason})` } : { ...r.value, model: ctx.textModel };
   const verdict = checks.some((c) => c.status === "FAIL") || aiReview.status === "CONCERNS" ? "BLOCKED" : "VERIFIED";
   const pass = checks.filter((c) => c.status === "PASS").length;
   return {
