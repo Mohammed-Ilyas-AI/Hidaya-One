@@ -22,3 +22,5 @@ npm-debug.log*
 # Generated videos and run artefacts
 out/
 library/footage/
+# generated per-Short HyperFrames projects (reproducible with npm run produce)
+studio/hidayah-*/
