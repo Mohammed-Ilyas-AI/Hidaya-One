@@ -15,7 +15,8 @@ import { verify } from "./agents/verification.ts";
 import { writeScript } from "./agents/script.ts";
 import { mediaChecks, builtTextChecks, builtGlyphChecks, hfCheckToChecks } from "./agents/qc.ts";
 import { channelManager } from "./agents/channel.ts";
-import { publish, paused } from "./agents/publisher.ts";
+import { publish, paused, publishMode } from "./agents/publisher.ts";
+import { issueRelease } from "./agents/release.ts";
 import { planPhrases } from "./hf/timing.ts";
 import { buildProject, gradeFootage, T } from "./hf/build.ts";
 import { writeJson, now } from "./lib/util.ts";
@@ -97,8 +98,15 @@ export async function produceOne(ref: string, publishAt?: string) {
   writeJson(path.join(ctx.outDir, "youtube-metadata.json"), md);
   if (md.hidayah.releaseGate === "HOLD") { console.log("⚠ HOLD — QC failed, not uploading"); return { id, final, gate: "HOLD" }; }
 
+  // Release approval, issued by code only when every gate passed and bound to this exact render.
+  const rel = issueRelease({
+    shortId: id, script: { script: sc, onScreen: built.onScreen }, videoFile: final, metadata: md, verification: ver, qc,
+    channelId: process.env.HIDAYAH_YOUTUBE_CHANNEL_ID, mode: publishMode(), publishAt,
+  });
+  writeJson(path.join(ctx.outDir, "release.json"), "release" in rel ? rel.release : { refused: rel.refused });
   const pub = await step(ctx, "10 youtube", async () => {
-    const r: any = await publish(id, final, md, { publishAt });
+    if (!("release" in rel)) return { value: { status: "HOLD", detail: rel.refused }, summary: `HOLD · ${rel.refused}` };
+    const r: any = await publish(id, final, md, { publishAt, release: rel.release });
     return { value: r, summary: `${r.status}${r.videoId ? ` · https://youtu.be/${r.videoId}` : ""}${r.detail ? ` · ${r.detail}` : ""}` };
   });
   writeJson(path.join(ctx.outDir, "run-report.json"), { id, ref, finishedAt: now(), final, gate: md.hidayah.releaseGate, publish: pub, agents: ctx.logs });

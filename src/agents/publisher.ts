@@ -5,11 +5,13 @@
 //   AUTONOMOUS      upload and publish: with publishAt the video is private until that time, then YouTube makes
 //                   it public by itself; without publishAt it is public immediately
 // Pause: HIDAYAH_PAUSED=1 or a registry/PAUSE file stops every upload at once.
-// Only releaseGate READY_TO_PUBLISH content reaches this point (verification + QC passed in code).
+// Every upload needs a code-issued release approval (src/agents/release.ts) that matches the exact video,
+// metadata, channel, visibility and publish time; anything else is HOLD. There is no per-video human approval.
 // Never upload the same Short twice (local ledger + a hidden tag checked on the channel before every upload).
 import { readFileSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { checkRelease, plannedVisibility, releaseKey, type ReleaseApproval } from "./release.ts";
 
 const OAUTH = "https://oauth2.googleapis.com/token";
 const API = "https://www.googleapis.com/youtube/v3";
@@ -55,39 +57,47 @@ function ledger(): Record<string, { videoId: string; uploadedAt: string }> {
   return existsSync(LEDGER) ? JSON.parse(readFileSync(LEDGER, "utf8")) : {};
 }
 
-/** Is a Short with this hidden tag already on the channel? (checks the 50 most recent uploads) */
-async function alreadyOnChannel(token: string, tag: string): Promise<string | null> {
+/** The signed-in channel, and whether a Short with this hidden tag is already on it (50 most recent uploads). */
+async function channelState(token: string, tag: string): Promise<{ channelId: string | null; existing: string | null }> {
   const H = { Authorization: `Bearer ${token}` };
-  const ch: any = await (await fetch(`${API}/channels?part=contentDetails&mine=true`, { headers: H })).json();
+  const ch: any = await (await fetch(`${API}/channels?part=id,contentDetails&mine=true`, { headers: H })).json();
+  const channelId: string | null = ch.items?.[0]?.id ?? null;
   const uploads = ch.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-  if (!uploads) return null;
+  if (!uploads) return { channelId, existing: null };
   const pl: any = await (await fetch(`${API}/playlistItems?part=contentDetails&maxResults=50&playlistId=${uploads}`, { headers: H })).json();
   const ids = (pl.items ?? []).map((i: any) => i.contentDetails.videoId).join(",");
-  if (!ids) return null;
+  if (!ids) return { channelId, existing: null };
   const vs: any = await (await fetch(`${API}/videos?part=snippet&id=${ids}`, { headers: H })).json();
-  return (vs.items ?? []).find((v: any) => (v.snippet.tags ?? []).includes(tag))?.id ?? null;
+  return { channelId, existing: (vs.items ?? []).find((v: any) => (v.snippet.tags ?? []).includes(tag))?.id ?? null };
 }
 
-export async function publish(shortId: string, file: string, metadata: any, opts: { publishAt?: string } = {}) {
+export async function publish(shortId: string, file: string, metadata: any, opts: { publishAt?: string; release?: ReleaseApproval | null } = {}) {
   const mode = publishMode();
   if (mode === "DRAFT_ONLY") return { status: "DRAFT_ONLY" as const, detail: "upload disabled (HIDAYAH_PUBLISH_MODE is DRAFT_ONLY)" };
   if (paused()) return { status: "PAUSED" as const, detail: "publishing is paused (HIDAYAH_PAUSED or registry/PAUSE)" };
   if (metadata?.hidayah?.releaseGate !== "READY_TO_PUBLISH") {
     return { status: "HOLD" as const, detail: `release gate is ${metadata?.hidayah?.releaseGate ?? "missing"}, not READY_TO_PUBLISH` };
   }
+  if (!opts.release) return { status: "HOLD" as const, detail: "no release approval for this Short" };
+  if (!releaseKey()) return { status: "HOLD" as const, detail: "HIDAYAH_RELEASE_KEY is not configured" };
   const creds = credsFromEnv();
   if (!creds) return { status: "NOT_CONNECTED" as const, detail: "no YouTube credentials (run scripts/youtube-auth.mjs)" };
   const done = ledger()[shortId];
   if (done) return { status: "ALREADY_UPLOADED" as const, videoId: done.videoId };
   const token = await accessToken(creds);
   const tag = `hidayah-${shortId}`;
-  const existing = await alreadyOnChannel(token, tag);
+  const { channelId, existing } = await channelState(token, tag);
   if (existing) { recordUpload(shortId, existing); return { status: "ALREADY_UPLOADED" as const, videoId: existing }; }
 
   // AUTONOMOUS: scheduled → private with publishAt (YouTube publishes it then); unscheduled → public now.
   // PRIVATE_UPLOAD: always private; a publishAt is dropped so nothing becomes public by itself.
   const scheduled = mode === "AUTONOMOUS" && opts.publishAt ? opts.publishAt : undefined;
   const privacyStatus = mode === "AUTONOMOUS" && !scheduled ? "public" : "private";
+  // The release must match exactly what is about to go out.
+  const mismatch = checkRelease(opts.release, {
+    shortId, videoFile: file, metadata, channelId, visibility: plannedVisibility(mode, scheduled), publishAt: scheduled ?? null,
+  });
+  if (mismatch) return { status: "HOLD" as const, detail: `release approval does not match: ${mismatch}` };
   const body = {
     snippet: { ...metadata.snippet, tags: [...(metadata.snippet.tags ?? []), tag] },
     status: { ...metadata.status, privacyStatus, ...(scheduled ? { publishAt: scheduled } : {}) },

@@ -123,6 +123,7 @@ test("consent denied ends cleanly with a clear error", async () => {
 
 test("publisher modes: AUTONOMOUS publishes (scheduled or now), PRIVATE_UPLOAD never does, pause and HOLD stop all", async () => {
   const { publish } = await import("../src/agents/publisher.ts");
+  const { issueRelease } = await import("../src/agents/release.ts");
   const dir = mkdtempSync(path.join(tmpdir(), "hidayah-pub-"));
   const video = path.join(dir, "v.mp4"); writeFileSync(video, "FAKE-VIDEO");
   const cwd = process.cwd(); process.chdir(dir); mkdirSync("registry");
@@ -132,32 +133,99 @@ test("publisher modes: AUTONOMOUS publishes (scheduled or now), PRIVATE_UPLOAD n
     const u = String(url);
     const json = (b: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(b), { status: 200, headers });
     if (u.includes("/token")) return json({ access_token: "FAKE-at" });
-    if (u.includes("/channels")) return json({ items: [] });
+    if (u.includes("/channels")) return json({ items: [{ id: "UC-test", contentDetails: { relatedPlaylists: {} } }] });
     if (u.includes("uploadType=resumable")) { sent.push(JSON.parse(init.body)); return json({}, { location: "https://upload.example/put" }); }
     if (u.startsWith("https://upload.example")) return json({ id: `vid${sent.length}` });
     throw new Error(`unexpected ${u}`);
   }) as any;
-  Object.assign(process.env, { YOUTUBE_CLIENT_ID: "id", YOUTUBE_CLIENT_SECRET: "TEST-PLACEHOLDER", YOUTUBE_REFRESH_TOKEN: "TEST-RT", HIDAYAH_PAUSE_FILE: "registry/PAUSE" });
+  Object.assign(process.env, {
+    YOUTUBE_CLIENT_ID: "id", YOUTUBE_CLIENT_SECRET: "TEST-PLACEHOLDER", YOUTUBE_REFRESH_TOKEN: "TEST-RT", HIDAYAH_PAUSE_FILE: "registry/PAUSE",
+    HIDAYAH_RELEASE_KEY: "test-only-release-key-0123456789abcdef",
+  });
   const md = { snippet: { tags: [] }, status: {}, hidayah: { releaseGate: "READY_TO_PUBLISH" } };
+  // Code issues the release when every gate passed; no human step.
+  const rel = (shortId: string, mode: string, publishAt?: string, metadata: any = md) => {
+    const r = issueRelease({ shortId, script: { hook: "TEST" }, videoFile: video, metadata, verification: { verdict: "VERIFIED" }, qc: [{ status: "PASS" }], channelId: "UC-test", mode, publishAt });
+    if (!("release" in r)) throw new Error(r.refused);
+    return r.release;
+  };
   try {
     process.env.HIDAYAH_PUBLISH_MODE = "AUTONOMOUS";
     const at = "2030-01-01T01:30:00.000Z";
-    const s = await publish("a", video, md, { publishAt: at });
+    const s = await publish("a", video, md, { publishAt: at, release: rel("a", "AUTONOMOUS", at) });
     assert.equal(s.status, "SCHEDULED"); assert.deepEqual([sent[0].status.privacyStatus, sent[0].status.publishAt], ["private", at]);
-    const p = await publish("b", video, md);
+    const p = await publish("b", video, md, { release: rel("b", "AUTONOMOUS") });
     assert.equal(p.status, "PUBLISHED"); assert.equal(sent[1].status.privacyStatus, "public");
-    assert.equal((await publish("a", video, md)).status, "ALREADY_UPLOADED", "never twice");
-    assert.equal((await publish("c", video, { ...md, hidayah: { releaseGate: "HOLD" } })).status, "HOLD");
+    assert.equal((await publish("a", video, md, { publishAt: at, release: rel("a", "AUTONOMOUS", at) })).status, "ALREADY_UPLOADED", "never twice");
+    assert.equal((await publish("c", video, { ...md, hidayah: { releaseGate: "HOLD" } }, { release: rel("c", "AUTONOMOUS") })).status, "HOLD");
     writeFileSync("registry/PAUSE", "");
-    assert.equal((await publish("d", video, md)).status, "PAUSED");
+    assert.equal((await publish("d", video, md, { release: rel("d", "AUTONOMOUS") })).status, "PAUSED");
     rmSync("registry/PAUSE");
     process.env.HIDAYAH_PUBLISH_MODE = "PRIVATE_UPLOAD";
-    const q = await publish("e", video, md, { publishAt: at });
+    const q = await publish("e", video, md, { publishAt: at, release: rel("e", "PRIVATE_UPLOAD", at) });
     assert.equal(q.status, "UPLOADED_PRIVATE"); assert.equal(sent.at(-1).status.privacyStatus, "private"); assert.equal(sent.at(-1).status.publishAt, undefined);
     assert.equal(sent.length, 3, "no upload for HOLD, PAUSED or a repeat");
   } finally {
     globalThis.fetch = realFetch; process.chdir(cwd);
-    for (const k of ["HIDAYAH_PUBLISH_MODE", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "HIDAYAH_PAUSE_FILE"]) delete process.env[k];
+    for (const k of ["HIDAYAH_PUBLISH_MODE", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "HIDAYAH_PAUSE_FILE", "HIDAYAH_RELEASE_KEY"]) delete process.env[k];
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("release approval: issued by code only when gates pass; any change to the render, metadata, channel or schedule is refused", async () => {
+  const { publish } = await import("../src/agents/publisher.ts");
+  const { issueRelease } = await import("../src/agents/release.ts");
+  const dir = mkdtempSync(path.join(tmpdir(), "hidayah-rel-"));
+  const video = path.join(dir, "v.mp4"); writeFileSync(video, "FAKE-VIDEO");
+  const cwd = process.cwd(); process.chdir(dir); mkdirSync("registry");
+  let uploads = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: any) => {
+    const u = String(url);
+    const json = (b: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(b), { status: 200, headers });
+    if (u.includes("/token")) return json({ access_token: "FAKE-at" });
+    if (u.includes("/channels")) return json({ items: [{ id: "UC-test", contentDetails: { relatedPlaylists: {} } }] });
+    if (u.includes("uploadType=resumable")) { uploads++; return json({}, { location: "https://upload.example/put" }); }
+    if (u.startsWith("https://upload.example")) return json({ id: "vid" });
+    throw new Error(`unexpected ${u}`);
+  }) as any;
+  Object.assign(process.env, {
+    YOUTUBE_CLIENT_ID: "id", YOUTUBE_CLIENT_SECRET: "TEST-PLACEHOLDER", YOUTUBE_REFRESH_TOKEN: "TEST-RT", HIDAYAH_PAUSE_FILE: "registry/PAUSE",
+    HIDAYAH_RELEASE_KEY: "test-only-release-key-0123456789abcdef", HIDAYAH_PUBLISH_MODE: "AUTONOMOUS",
+  });
+  const md = { snippet: { title: "TEST", tags: [] }, status: {}, hidayah: { releaseGate: "READY_TO_PUBLISH" } };
+  const at = "2030-01-01T01:30:00.000Z";
+  const base = { shortId: "x", script: { hook: "TEST" }, videoFile: video, metadata: md, verification: { verdict: "VERIFIED" }, qc: [{ status: "PASS" }], channelId: "UC-test", mode: "AUTONOMOUS", publishAt: at };
+  try {
+    // Code refuses to issue a release unless every gate passed and the key and channel are configured.
+    assert.match((issueRelease({ ...base, verification: { verdict: "BLOCKED" } }) as any).refused, /verification is BLOCKED/);
+    assert.match((issueRelease({ ...base, qc: [{ status: "FAIL" }] }) as any).refused, /QC check/);
+    assert.match((issueRelease({ ...base, metadata: { ...md, hidayah: { releaseGate: "HOLD" } } }) as any).refused, /release gate is HOLD/);
+    assert.match((issueRelease({ ...base, channelId: undefined }) as any).refused, /CHANNEL_ID/);
+    const ok = issueRelease(base) as any;
+    assert.equal(ok.release.issuer, "CODE_GATES");
+    const release = ok.release;
+    const hold = async (detail: RegExp, md2 = md, opts: any = {}) => {
+      const r: any = await publish("x", video, md2, { publishAt: at, release, ...opts });
+      assert.equal(r.status, "HOLD"); assert.match(r.detail, detail);
+    };
+    await hold(/no release approval/, md, { release: undefined });
+    await hold(/metadata changed/, { ...md, snippet: { ...md.snippet, title: "TEST-CHANGED" } });
+    await hold(/different visibility or publish time/, md, { publishAt: "2030-01-02T01:30:00.000Z" });
+    await hold(/signature is invalid/, md, { release: { ...release, channelId: "UC-other" } });
+    await hold(/another Short/, md, { release: (issueRelease({ ...base, shortId: "y" }) as any).release });
+    writeFileSync(video, "FAKE-VIDEO-EDITED");
+    await hold(/video file changed/);
+    writeFileSync(video, "FAKE-VIDEO");
+    process.env.HIDAYAH_RELEASE_KEY = "another-test-key-0123456789abcdefghij";
+    await hold(/signature is invalid/);
+    process.env.HIDAYAH_RELEASE_KEY = "test-only-release-key-0123456789abcdef";
+    assert.equal(uploads, 0, "nothing uploaded while the release does not match");
+    assert.equal((await publish("x", video, md, { publishAt: at, release })).status, "SCHEDULED");
+    assert.equal(uploads, 1);
+  } finally {
+    globalThis.fetch = realFetch; process.chdir(cwd);
+    for (const k of ["HIDAYAH_PUBLISH_MODE", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "HIDAYAH_PAUSE_FILE", "HIDAYAH_RELEASE_KEY"]) delete process.env[k];
     rmSync(dir, { recursive: true, force: true });
   }
 });
