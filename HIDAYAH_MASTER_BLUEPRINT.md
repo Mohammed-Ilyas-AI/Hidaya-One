@@ -17,7 +17,7 @@
 - **Publishing:** YouTube Data API v3 and YouTube Analytics API, authorized through owner-granted OAuth 2.0 permissions.
 - **Founder control:** Minimal Google-hosted dashboard with production queue, factual-source review, budget, publication calendar, incident reports, and kill switch.
 - **Initial budget target:** US$50/month *planning ceiling*, not a promise that all services will fit. At $0.07 per generated second, 30 successful 15-second 720p generations total ~$31.50 in video-generation cost alone; retries and all other services add cost.
-- **Operating rule:** Fully automated execution; publication of *pre-verified, policy-compliant content only*. Unresolved religious claims or publisher-policy issues move to human review, never silent approval.
+- **Operating rule (founder decision 2026-11-24):** Fully autonomous — the agents produce and publish every day with no per-video founder approval. Only content that passed the automated verification and QC gates is published; anything that fails is skipped (logged, never published) and the next item takes its slot. The founder controls the channel with the publish mode and the pause switch, not by approving videos.
 
 ## 2. Investigation first: no spending, deployment, or production changes
 
@@ -141,7 +141,7 @@ Deduplicate on `(channel_id, publication_date, content_version)` and persist the
 6. Generate/approve narration; add precise licensed Arabic/English text and subtitle timings with deterministic renderer.
 7. Run technical tests (dimensions, frames, codec, loudness, subtitle clipping, continuity, 15-second range) and semantic checks against source and narration.
 8. Failed QA: one bounded regeneration if budget remains, then hold for review. No silent source substitution.
-9. Upload as private; confirm processing completed, inspect metadata and flags, and schedule a public release only if configured approval gates pass.
+9. Upload: in AUTONOMOUS mode, scheduled Shorts go up private with `publishAt` and YouTube makes them public at the slot; only gate-passed (READY_TO_PUBLISH) content is uploaded; the pause switch stops all uploads.
 10. Collect analytics asynchronously at suitable intervals; provide a daily digest and weekly learning report.
 
 **Failure rules:** Exponential backoff for transient 429/5xx; never retry permanent validation errors; strict timeouts and per-stage rate limits; do not auto-resubmit upload when response is ambiguous before reconciling YouTube channel videos; pause if licensing, source checks, or spend guards fail. Alerts go to the founder; daily upload can be skipped rather than publish potentially false religious content.

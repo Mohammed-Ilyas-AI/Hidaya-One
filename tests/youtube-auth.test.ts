@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -119,6 +119,55 @@ test("consent denied ends cleanly with a clear error", async () => {
   assert.equal(await run.done, 1); assert.match(run.output(), /access_denied/);
   assert.ok(!existsSync(path.join(home, "youtube-auth.lock")));
   g.srv.closeAllConnections(); g.srv.close();
+});
+
+test("publisher modes: AUTONOMOUS publishes (scheduled or now), PRIVATE_UPLOAD never does, pause and HOLD stop all", async () => {
+  const { publish } = await import("../src/agents/publisher.ts");
+  const dir = mkdtempSync(path.join(tmpdir(), "hidayah-pub-"));
+  const video = path.join(dir, "v.mp4"); writeFileSync(video, "FAKE-VIDEO");
+  const cwd = process.cwd(); process.chdir(dir); mkdirSync("registry");
+  const sent: any[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: any, init: any = {}) => {
+    const u = String(url);
+    const json = (b: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(b), { status: 200, headers });
+    if (u.includes("/token")) return json({ access_token: "FAKE-at" });
+    if (u.includes("/channels")) return json({ items: [] });
+    if (u.includes("uploadType=resumable")) { sent.push(JSON.parse(init.body)); return json({}, { location: "https://upload.example/put" }); }
+    if (u.startsWith("https://upload.example")) return json({ id: `vid${sent.length}` });
+    throw new Error(`unexpected ${u}`);
+  }) as any;
+  Object.assign(process.env, { YOUTUBE_CLIENT_ID: "id", YOUTUBE_CLIENT_SECRET: "TEST-PLACEHOLDER", YOUTUBE_REFRESH_TOKEN: "TEST-RT", HIDAYAH_PAUSE_FILE: "registry/PAUSE" });
+  const md = { snippet: { tags: [] }, status: {}, hidayah: { releaseGate: "READY_TO_PUBLISH" } };
+  try {
+    process.env.HIDAYAH_PUBLISH_MODE = "AUTONOMOUS";
+    const at = "2030-01-01T01:30:00.000Z";
+    const s = await publish("a", video, md, { publishAt: at });
+    assert.equal(s.status, "SCHEDULED"); assert.deepEqual([sent[0].status.privacyStatus, sent[0].status.publishAt], ["private", at]);
+    const p = await publish("b", video, md);
+    assert.equal(p.status, "PUBLISHED"); assert.equal(sent[1].status.privacyStatus, "public");
+    assert.equal((await publish("a", video, md)).status, "ALREADY_UPLOADED", "never twice");
+    assert.equal((await publish("c", video, { ...md, hidayah: { releaseGate: "HOLD" } })).status, "HOLD");
+    writeFileSync("registry/PAUSE", "");
+    assert.equal((await publish("d", video, md)).status, "PAUSED");
+    rmSync("registry/PAUSE");
+    process.env.HIDAYAH_PUBLISH_MODE = "PRIVATE_UPLOAD";
+    const q = await publish("e", video, md, { publishAt: at });
+    assert.equal(q.status, "UPLOADED_PRIVATE"); assert.equal(sent.at(-1).status.privacyStatus, "private"); assert.equal(sent.at(-1).status.publishAt, undefined);
+    assert.equal(sent.length, 3, "no upload for HOLD, PAUSED or a repeat");
+  } finally {
+    globalThis.fetch = realFetch; process.chdir(cwd);
+    for (const k of ["HIDAYAH_PUBLISH_MODE", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "HIDAYAH_PAUSE_FILE"]) delete process.env[k];
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("daily slots: only today's IST slots at least 30 minutes away", async () => {
+  const { remainingSlotsToday } = await import("../src/lib/slots.ts");
+  const t = Date.parse("2030-01-01T06:00:00+05:30");
+  assert.deepEqual(remainingSlotsToday(t), ["2030-01-01T01:30:00.000Z", "2030-01-01T07:30:00.000Z", "2030-01-01T14:00:00.000Z"]);
+  assert.deepEqual(remainingSlotsToday(Date.parse("2030-01-01T12:45:00+05:30")), ["2030-01-01T14:00:00.000Z"]);
+  assert.deepEqual(remainingSlotsToday(Date.parse("2030-01-01T20:00:00+05:30")), []);
 });
 
 test("publisher stays in DRAFT_ONLY by default and does not upload", async () => {

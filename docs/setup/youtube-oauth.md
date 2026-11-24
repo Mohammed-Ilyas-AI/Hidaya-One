@@ -50,20 +50,25 @@ The script:
 No code, token or secret is printed. Nothing is uploaded. If Windows Firewall asks about Node.js, **Allow on private networks**
 is not required — the listener only accepts 127.0.0.1 — you can click Cancel.
 
-## 5. Publishing stays off (DRAFT_ONLY)
-The publisher refuses to upload unless `HIDAYAH_PUBLISH_MODE=PRIVATE_UPLOAD` is set. Even then it uploads **private** only.
+## 5. Publish modes (founder decision 2026-11-24: autonomous channel)
+`HIDAYAH_PUBLISH_MODE` decides what the publisher does:
+- `DRAFT_ONLY` (default when unset): never uploads.
+- `PRIVATE_UPLOAD`: uploads private only; never schedules anything public.
+- `AUTONOMOUS`: publishes with no per-video approval. `npm run produce -- --daily` fills today's slots
+  (07:00, 13:00, 19:30 IST): each Short goes up private with `publishAt`, and YouTube makes it public at the slot.
+  Only content whose release gate is `READY_TO_PUBLISH` (verification passed, no QC FAIL) is uploaded; a verse that
+  fails is skipped and the next one takes the slot.
 
-## 6. Using the token from the cloud pipeline (later, when you decide)
-Open `%USERPROFILE%\.hidayah\youtube-token.json` in Notepad and copy `refresh_token`; take `client_id` and
-`client_secret` from your client JSON. Add them in the environment's settings (session title bar → environment → Edit →
-Environment variables) as `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN` — never in chat.
+**Pause switch:** set `HIDAYAH_PAUSED=1`, or create the file `registry/PAUSE`. Every upload stops until you remove it.
+Videos already scheduled stay scheduled on YouTube; change them in YouTube Studio if needed.
 
-**Security notes.** These three values let a program upload to your channel; anyone with access to this
-environment's settings can read environment variables. Revoke any time at https://myaccount.google.com/permissions
-(remove "Hidayah Publisher") or by deleting the client in step 3. For production on Cloud Run, store them in
-Secret Manager instead (the publisher reads the same variable names).
+## 6. Using the token in production (Cloud Run)
+Store the three values in **Secret Manager** (`YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`)
+and mount them as environment variables on the Cloud Run job; only the job's service account may read them. Do not
+paste them into chat, a repository, or a shared environment's settings. Revoke any time at
+https://myaccount.google.com/permissions (remove "Hidayah Publisher") or by deleting the client in step 3.
 
 ## What the publisher will and won't do
-- Uploads **private only** (explicit `privacyStatus: "private"`); scheduled Shorts use `publishAt` and stay private until that time.
+- Privacy is always explicit, never the API default. AUTONOMOUS: scheduled Shorts are private until `publishAt`, then public; an unscheduled one is public at once. PRIVATE_UPLOAD: private only.
 - Never uploads the same Short twice (ledger `registry/published.json` + a hidden tag checked on the channel).
 - Default quota is 100 uploads/day — far above our 3/day.

@@ -91,5 +91,8 @@ flowchart TD
 
 ## ADR-014 Verse registry and approval levels
 - `registry/verses.json` holds references only (never text). Status ladder: `PROPOSED` → `AI_APPROVED` (set automatically when the verification agent's Gemini review approves the verse for its topic) → `SCHOLAR_APPROVED` (human). `REJECTED` is never produced.
+- 2026-11-24 (founder): the channel is autonomous. No per-video approval: content that passes the automated verification
+  and QC gates is published on schedule (`HIDAYAH_PUBLISH_MODE=AUTONOMOUS`, `npm run produce -- --daily`); failures are
+  skipped. Control is the publish mode and the pause switch (`HIDAYAH_PAUSED=1` or `registry/PAUSE`).
 - Recitation must be ≤ 18.6 s to fit the 30 s format (measured; 13 of 42 candidates excluded).
 - The verification agent is asked about the **verse's own topic**; a topic mismatch blocks production (observed on the first 2:152 run when the prompt was still hard-coded to sabr — the gate held).

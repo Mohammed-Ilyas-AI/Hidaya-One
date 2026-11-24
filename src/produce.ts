@@ -1,9 +1,11 @@
 // HIDAYAH production orchestrator (Agent 1). One verse → one finished, checked, privately-uploaded Short.
 //   research → verification (gate) → script → creative (phrase plan + HyperFrames build + Adobe Stock plates)
-//   → hyperframes check (gate) → render → QC (gate) → channel metadata → YouTube private upload (if connected)
+//   → hyperframes check (gate) → render → QC (gate) → channel metadata → YouTube upload per HIDAYAH_PUBLISH_MODE
 // Usage:
 //   npm run produce -- --ref 2:152                 one Short
 //   npm run produce -- --batch 21 --start 2026-12-01   next 21 unpublished verses, scheduled 3/day
+//   npm run produce -- --daily                     autonomous daily run: fill today's remaining slots (IST);
+//                                                  a verse that fails a gate is skipped and the next one takes its slot
 import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
@@ -13,16 +15,17 @@ import { verify } from "./agents/verification.ts";
 import { writeScript } from "./agents/script.ts";
 import { mediaChecks, builtTextChecks, builtGlyphChecks, hfCheckToChecks } from "./agents/qc.ts";
 import { channelManager } from "./agents/channel.ts";
-import { publishPrivate } from "./agents/publisher.ts";
+import { publish, paused } from "./agents/publisher.ts";
 import { planPhrases } from "./hf/timing.ts";
 import { buildProject, gradeFootage, T } from "./hf/build.ts";
 import { writeJson, now } from "./lib/util.ts";
+import { SLOTS_IST, remainingSlotsToday } from "./lib/slots.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const HF = ["node", path.join(ROOT, ".claude/skills/hyperframes/scripts/plugin-cli.mjs"), "--cli-version", "0.9.86"];
 const arg = (k: string, d = "") => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const REG = () => JSON.parse(readFileSync(path.join(ROOT, "registry/verses.json"), "utf8"));
-const SLOTS_IST = ["07:00", "13:00", "19:30"];   // 3 Shorts/day, Asia/Kolkata
+// 3 Shorts/day, Asia/Kolkata (src/lib/slots.ts)
 
 function hf(dir: string, args: string[], timeoutMs = 3_600_000): string {
   return execFileSync(HF[0], [...HF.slice(1), ...args], { cwd: dir, env: { ...process.env, HYPERFRAMES_TELEMETRY: "0" }, maxBuffer: 64 << 20, timeout: timeoutMs }).toString();
@@ -58,7 +61,7 @@ export async function produceOne(ref: string, publishAt?: string) {
   const ver = await step(ctx, "3 verification", () => verify(ctx, rec, `${topic.label_en.toLowerCase()} (${entry.topic})`));
   writeJson(path.join(ctx.outDir, "verification.json"), ver);
   if (ver.verdict === "BLOCKED") throw new Error(`verification BLOCKED — ${JSON.stringify(ver.checks.filter((c) => c.status === "FAIL"))} ${ver.aiReview.notes}`);
-  if (entry.status === "PROPOSED" && ver.aiReview.status === "APPROVED") {   // record the agent's approval in the registry
+  if (entry.status === "PROPOSED" && ver.aiReview.status === "APPROVED") {   // record the review result (deterministic checks also passed)
     entry.status = "AI_APPROVED"; entry.aiReview = ver.aiReview.notes;
     writeFileSync(path.join(ROOT, "registry/verses.json"), JSON.stringify(reg, null, 2) + "\n");
   }
@@ -94,8 +97,8 @@ export async function produceOne(ref: string, publishAt?: string) {
   writeJson(path.join(ctx.outDir, "youtube-metadata.json"), md);
   if (md.hidayah.releaseGate === "HOLD") { console.log("⚠ HOLD — QC failed, not uploading"); return { id, final, gate: "HOLD" }; }
 
-  const pub = await step(ctx, "10 youtube (private)", async () => {
-    const r: any = await publishPrivate(id, final, md, { publishAt });
+  const pub = await step(ctx, "10 youtube", async () => {
+    const r: any = await publish(id, final, md, { publishAt });
     return { value: r, summary: `${r.status}${r.videoId ? ` · https://youtu.be/${r.videoId}` : ""}${r.detail ? ` · ${r.detail}` : ""}` };
   });
   writeJson(path.join(ctx.outDir, "run-report.json"), { id, ref, finishedAt: now(), final, gate: md.hidayah.releaseGate, publish: pub, agents: ctx.logs });
@@ -119,7 +122,35 @@ function slotIso(startDate: string, i: number): string {
   return new Date(`${day}T${SLOTS_IST[i % SLOTS_IST.length]}:00+05:30`).toISOString();
 }
 
+/**
+ * Autonomous daily run: one Short per remaining slot today. A verse that fails verification, QC or rendering is
+ * skipped and the next candidate takes the slot. Bounded: at most 2 candidates per slot (cost guard).
+ */
+async function daily() {
+  if (paused()) { console.log("⏸ paused (HIDAYAH_PAUSED or registry/PAUSE) — nothing produced"); return []; }
+  const slots = remainingSlotsToday();
+  const candidates = nextVerses(slots.length * 2);
+  const results: any[] = [];
+  for (const slot of slots) {
+    while (candidates.length) {
+      const r = candidates.shift()!;
+      try {
+        const out = await produceOne(r, slot);
+        results.push({ slot, ...out });
+        if (out.gate !== "HOLD") break;            // slot filled
+      } catch (e: any) { console.error(`✖ ${r}: ${e.message} — trying the next verse`); results.push({ slot, ref: r, error: e.message }); }
+    }
+  }
+  return results;
+}
+
 if (import.meta.filename === path.resolve(process.argv[1] ?? "")) {
+  if (process.argv.includes("--daily")) {
+    const results = await daily();
+    writeJson(path.join(ROOT, "out", `daily-${now().slice(0, 10)}.json`), results);
+    console.log(`\ndaily done: ${results.filter((r) => r.gate === "READY_TO_PUBLISH").length} ready, ${results.filter((r) => r.error || r.gate === "HOLD").length} skipped`);
+    process.exit(0);
+  }
   const ref = arg("ref"), batch = Number(arg("batch", "0")), start = arg("start");
   const refs = ref ? [ref] : nextVerses(batch || 1);
   const results: any[] = [];

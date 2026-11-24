@@ -1,6 +1,12 @@
 // YouTube publisher (YouTube Data API v3, OAuth 2.0 "Desktop app" client, owner-granted refresh token).
-// Rules: always privacyStatus "private" (API default is PUBLIC since 2026-11-02); optional publishAt schedule;
-// never upload the same Short twice (local ledger + a hidden tag checked on the channel before every upload).
+// Modes (owner decision 2026-11-24: the channel publishes autonomously, no per-video approval):
+//   DRAFT_ONLY      never upload (default when nothing is configured)
+//   PRIVATE_UPLOAD  upload as private only
+//   AUTONOMOUS      upload and publish: with publishAt the video is private until that time, then YouTube makes
+//                   it public by itself; without publishAt it is public immediately
+// Pause: HIDAYAH_PAUSED=1 or a registry/PAUSE file stops every upload at once.
+// Only releaseGate READY_TO_PUBLISH content reaches this point (verification + QC passed in code).
+// Never upload the same Short twice (local ledger + a hidden tag checked on the channel before every upload).
 import { readFileSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -12,9 +18,17 @@ const LEDGER = "registry/published.json";
 
 export interface YouTubeCreds { clientId: string; clientSecret: string; refreshToken: string }
 
-/** DRAFT_ONLY (default): never upload. PRIVATE_UPLOAD: upload as private (optionally scheduled). Nothing else exists. */
-export function publishMode(): "DRAFT_ONLY" | "PRIVATE_UPLOAD" {
-  return process.env.HIDAYAH_PUBLISH_MODE === "PRIVATE_UPLOAD" ? "PRIVATE_UPLOAD" : "DRAFT_ONLY";
+export type PublishMode = "DRAFT_ONLY" | "PRIVATE_UPLOAD" | "AUTONOMOUS";
+
+/** From HIDAYAH_PUBLISH_MODE; anything unrecognised is DRAFT_ONLY. */
+export function publishMode(): PublishMode {
+  const m = process.env.HIDAYAH_PUBLISH_MODE;
+  return m === "AUTONOMOUS" || m === "PRIVATE_UPLOAD" ? m : "DRAFT_ONLY";
+}
+
+/** Owner's emergency stop: HIDAYAH_PAUSED=1, or a registry/PAUSE file (create it to pause, delete it to resume). */
+export function paused(): boolean {
+  return process.env.HIDAYAH_PAUSED === "1" || existsSync(process.env.HIDAYAH_PAUSE_FILE ?? "registry/PAUSE");
 }
 
 /** Credentials from env vars, else from the token file written by scripts/youtube-auth.mjs (secret read from the client file). */
@@ -54,8 +68,13 @@ async function alreadyOnChannel(token: string, tag: string): Promise<string | nu
   return (vs.items ?? []).find((v: any) => (v.snippet.tags ?? []).includes(tag))?.id ?? null;
 }
 
-export async function publishPrivate(shortId: string, file: string, metadata: any, opts: { publishAt?: string } = {}) {
-  if (publishMode() === "DRAFT_ONLY") return { status: "DRAFT_ONLY" as const, detail: "upload disabled (HIDAYAH_PUBLISH_MODE is not PRIVATE_UPLOAD)" };
+export async function publish(shortId: string, file: string, metadata: any, opts: { publishAt?: string } = {}) {
+  const mode = publishMode();
+  if (mode === "DRAFT_ONLY") return { status: "DRAFT_ONLY" as const, detail: "upload disabled (HIDAYAH_PUBLISH_MODE is DRAFT_ONLY)" };
+  if (paused()) return { status: "PAUSED" as const, detail: "publishing is paused (HIDAYAH_PAUSED or registry/PAUSE)" };
+  if (metadata?.hidayah?.releaseGate !== "READY_TO_PUBLISH") {
+    return { status: "HOLD" as const, detail: `release gate is ${metadata?.hidayah?.releaseGate ?? "missing"}, not READY_TO_PUBLISH` };
+  }
   const creds = credsFromEnv();
   if (!creds) return { status: "NOT_CONNECTED" as const, detail: "no YouTube credentials (run scripts/youtube-auth.mjs)" };
   const done = ledger()[shortId];
@@ -65,12 +84,18 @@ export async function publishPrivate(shortId: string, file: string, metadata: an
   const existing = await alreadyOnChannel(token, tag);
   if (existing) { recordUpload(shortId, existing); return { status: "ALREADY_UPLOADED" as const, videoId: existing }; }
 
+  // AUTONOMOUS: scheduled → private with publishAt (YouTube publishes it then); unscheduled → public now.
+  // PRIVATE_UPLOAD: always private; a publishAt is dropped so nothing becomes public by itself.
+  const scheduled = mode === "AUTONOMOUS" && opts.publishAt ? opts.publishAt : undefined;
+  const privacyStatus = mode === "AUTONOMOUS" && !scheduled ? "public" : "private";
   const body = {
     snippet: { ...metadata.snippet, tags: [...(metadata.snippet.tags ?? []), tag] },
-    status: { ...metadata.status, privacyStatus: "private", ...(opts.publishAt ? { publishAt: opts.publishAt } : {}) },
+    status: { ...metadata.status, privacyStatus, ...(scheduled ? { publishAt: scheduled } : {}) },
     paidProductPlacementDetails: { hasPaidProductPlacement: false },
   };
-  if (body.status.privacyStatus !== "private") throw new Error("refusing to upload a non-private video");
+  if (mode === "PRIVATE_UPLOAD" && (body.status.privacyStatus !== "private" || "publishAt" in body.status)) {
+    throw new Error("PRIVATE_UPLOAD never publishes: refusing a public or scheduled upload");
+  }
   const size = statSync(file).size;
   const init = await fetch(`${UPLOAD}?uploadType=resumable&part=snippet,status,paidProductPlacementDetails`, {
     method: "POST",
@@ -83,8 +108,12 @@ export async function publishPrivate(shortId: string, file: string, metadata: an
   const v: any = await put.json();
   if (!put.ok || !v.id) throw new Error(`upload failed: ${put.status} ${JSON.stringify(v).slice(0, 300)}`);
   recordUpload(shortId, v.id);
-  return { status: "UPLOADED_PRIVATE" as const, videoId: v.id, publishAt: opts.publishAt ?? null };
+  const status = privacyStatus === "public" ? ("PUBLISHED" as const) : scheduled ? ("SCHEDULED" as const) : ("UPLOADED_PRIVATE" as const);
+  return { status, videoId: v.id, publishAt: scheduled ?? null };
 }
+
+/** Kept for older callers: same as publish(). */
+export const publishPrivate = publish;
 
 function recordUpload(shortId: string, videoId: string) {
   const l = ledger(); l[shortId] = { videoId, uploadedAt: new Date().toISOString() };

@@ -1,5 +1,5 @@
-// Agent 9 — Channel Manager: YouTube metadata package. Upload is NOT connected (no OAuth yet);
-// when it is, the publisher must send privacyStatus "private" explicitly (API default is public since 2026-11-02).
+// Agent 9 — Channel Manager: YouTube metadata package and the release gate. READY_TO_PUBLISH only when
+// verification passed and QC has no FAIL; the publisher decides privacy from its mode (explicit, never the API default).
 import type { AyahRecord, Check, VerificationReport } from "../types.ts";
 import type { Script } from "./script.ts";
 import type { RunContext } from "./context.ts";
@@ -32,8 +32,8 @@ export function buildMetadata(rec: AyahRecord, sc: Script, ver: VerificationRepo
     paidProductPlacementDetails: { hasPaidProductPlacement: false },
     hidayah: {
       sourceId: rec.sourceId,
-      releaseGate: releasable ? "READY_FOR_HUMAN_SIGNOFF" : "HOLD",
-      uploadStatus: "NOT_UPLOADED (YouTube OAuth not connected)",
+      releaseGate: releasable ? "READY_TO_PUBLISH" : "HOLD",
+      uploadStatus: "NOT_UPLOADED",
       openLicenseQuestions: rec.license.filter((l) => /NOT yet/.test(l)),
     },
   };
@@ -41,5 +41,5 @@ export function buildMetadata(rec: AyahRecord, sc: Script, ver: VerificationRepo
 
 export async function channelManager(_ctx: RunContext, rec: AyahRecord, sc: Script, ver: VerificationReport, qc: Check[], topicEn = "Patience") {
   const md = buildMetadata(rec, sc, ver, qc, topicEn);
-  return { value: md, summary: `metadata ready, privacy=private, gate=${md.hidayah.releaseGate}, upload not connected` };
+  return { value: md, summary: `metadata ready, gate=${md.hidayah.releaseGate}` };
 }
