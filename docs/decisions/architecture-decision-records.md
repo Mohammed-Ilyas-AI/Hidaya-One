@@ -78,3 +78,18 @@ flowchart TD
 - **Context:** Reviewed FavStash, Viprasol, Melvynx and video-explainer skills (`docs/research/open-source-video-skills-evaluation.md`). Spike `spikes/html-renderer/` proved headless Arabic (RTL, tashkeel) and Tamil rendering, byte-exact text QC and a 24 s render time for a 15 s 1080×1920 Short.
 - **Decision:** The renderer (Cloud Run Job) composites an HTML/GSAP-style composition rendered by headless Chromium, then encodes it with FFmpeg. This supersedes FFmpeg `drawtext` for text in ADR-007. Motion graphics become the default visual. VEED Fabric (ADR-011) and Omni (ADR-002) are optional premium layers. HyperFrames (Apache-2.0) to be evaluated in M4. Viprasol-style QC (script/glyph/shaping checks) is added to the QC stage.
 - **Rejected:** Melvynx engine (prebuilt macOS binaries, camera-first, third-party publishing); Kokoro/Chatterbox as launch TTS (no Tamil/Arabic; archived/watermarked); running Claude Code skills as the production pipeline (blueprint: Claude Code is dev-only).
+
+## ADR-013 Adobe (Express Premium) as the media toolkit; HyperFrames as the renderer; weekly batch (2026-11-24)
+- **Context:** Founder has Adobe Express Premium (+250 Firefly credits). The Adobe connector in Claude sessions provides Adobe Stock search/licensing, image editing, fonts and Express design export; **Firefly generation is disabled in this connector** (except generative expand), and the connector exists only inside an interactive Claude session — it cannot be called from Cloud Run.
+- **Decision:**
+  1. Visual plates come from a **footage library** (`library/footage.json`, files in `library/footage/`, git-ignored) filled from Adobe Stock in Claude sessions — free-tier clips licensed through the founder's account — and, when the founder generates them, from Firefly (picked up via `asset_search` scope `GenAIAsset`).
+  2. The Creative agent maps each topic's moods to library plates; plates are graded with HyperFrames `media-treatment` for legibility.
+  3. **HyperFrames** renders every Short from a generated project (`src/hf/build.ts`); `hyperframes check` is a hard gate.
+  4. **Operating model:** a weekly batch session (`npm run produce -- --batch 21 --start <date>`) produces 21 Shorts, each uploaded to YouTube as **private** with a `publishAt` slot (07:00 / 13:00 / 19:30 IST). The founder reviews in YouTube Studio; anything not approved is simply left private.
+- **Supersedes:** ADR-011 (VEED presenter — dropped by founder), ADR-012's code-drawn background (kept only as a fallback look).
+- **Rejected:** unattended Cloud Run rendering with Adobe (needs Adobe Firefly Services enterprise API); Express `animate_design` for Shorts (cannot sync text to recitation).
+
+## ADR-014 Verse registry and approval levels
+- `registry/verses.json` holds references only (never text). Status ladder: `PROPOSED` → `AI_APPROVED` (set automatically when the verification agent's Gemini review approves the verse for its topic) → `SCHOLAR_APPROVED` (human). `REJECTED` is never produced.
+- Recitation must be ≤ 18.6 s to fit the 30 s format (measured; 13 of 42 candidates excluded).
+- The verification agent is asked about the **verse's own topic**; a topic mismatch blocks production (observed on the first 2:152 run when the prompt was still hard-coded to sabr — the gate held).

@@ -32,13 +32,13 @@ export function deterministicChecks(rec: AyahRecord): Check[] {
   return c;
 }
 
-export async function verify(ctx: RunContext, rec: AyahRecord): Promise<{ value: VerificationReport; summary: string; llm?: string }> {
+export async function verify(ctx: RunContext, rec: AyahRecord, topicEn = "patience (sabr)"): Promise<{ value: VerificationReport; summary: string; llm?: string }> {
   const checks = deterministicChecks(rec);
   let aiReview: VerificationReport["aiReview"];
   try {
     const r = await chat(ctx.textModel,
       "You are a careful Islamic studies reviewer. Answer in JSON {\"status\":\"APPROVED\"|\"CONCERNS\",\"notes\":\"...\"}. Do not quote scripture from memory.",
-      `Is it appropriate and in-context to present Qur'an ${rec.sourceId} as a general reminder about patience (sabr) in a 30-second video? Translation (en): ${rec.translations.find(t => t.lang === "en")?.text}`);
+      `Is it appropriate and in-context to present Qur'an ${rec.sourceId} as a general reminder about ${topicEn} in a 30-second video, quoting the full verse with this translation? Translation (en): ${rec.translations.find(t => t.lang === "en")?.text}`);
     const j = JSON.parse(r.text.replace(/```json|```/g, ""));
     aiReview = { status: j.status === "APPROVED" ? "APPROVED" : "CONCERNS", model: ctx.textModel, notes: j.notes ?? "" };
   } catch (e) {

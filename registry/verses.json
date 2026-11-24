@@ -1,0 +1,301 @@
+{
+  "_about": "Hidayah verse registry. Every entry is a reference only — Arabic text and translations are always fetched from the named sources at production time, never stored or written by hand. status: PROPOSED (chosen for common, context-safe use; awaiting review) → AI_APPROVED (verification agent's Gemini review passed; set by the pipeline) → SCHOLAR_APPROVED (human sign-off; required before public auto-publishing). Recitation lengths (Alafasy, everyayah.com) measured 2026-11-24; the pipeline rejects anything over 18.5 s.",
+  "topics": {
+    "sabr": {
+      "label_ar": "صَبْر",
+      "label_en": "Patience",
+      "moods": [
+        "night",
+        "dawn",
+        "sunrise"
+      ]
+    },
+    "shukr": {
+      "label_ar": "شُكْر",
+      "label_en": "Gratitude",
+      "moods": [
+        "forest-light",
+        "ocean-dawn",
+        "sky-light"
+      ]
+    },
+    "dhikr": {
+      "label_ar": "ذِكْر",
+      "label_en": "Remembrance",
+      "moods": [
+        "mist",
+        "sky-light",
+        "sunrise"
+      ]
+    },
+    "dua": {
+      "label_ar": "دُعَاء",
+      "label_en": "Supplication",
+      "moods": [
+        "rain-night",
+        "night",
+        "sky-light"
+      ]
+    },
+    "rajaa": {
+      "label_ar": "رَجَاء",
+      "label_en": "Hope",
+      "moods": [
+        "night",
+        "forest-light",
+        "sunrise"
+      ]
+    },
+    "tawhid": {
+      "label_ar": "تَوْحِيد",
+      "label_en": "Oneness",
+      "moods": [
+        "night",
+        "sky-light",
+        "ocean-dawn"
+      ]
+    },
+    "hidaya": {
+      "label_ar": "هِدَايَة",
+      "label_en": "Guidance",
+      "moods": [
+        "mist",
+        "forest-light",
+        "sunrise"
+      ]
+    },
+    "taqwa": {
+      "label_ar": "تَقْوَى",
+      "label_en": "God-consciousness",
+      "moods": [
+        "mist",
+        "dawn",
+        "sky-light"
+      ]
+    },
+    "akhira": {
+      "label_ar": "آخِرَة",
+      "label_en": "The Hereafter",
+      "moods": [
+        "rain-night",
+        "dunes",
+        "sky-light"
+      ]
+    },
+    "ihsan": {
+      "label_ar": "إِحْسَان",
+      "label_en": "Excellence",
+      "moods": [
+        "ocean-dawn",
+        "forest-light",
+        "sunrise"
+      ]
+    }
+  },
+  "verses": [
+    {
+      "ref": "2:153",
+      "topic": "sabr",
+      "recitationSec": 14.6,
+      "status": "PROPOSED",
+      "why": "General address to believers: seek help through patience and prayer; Allah is with the patient."
+    },
+    {
+      "ref": "2:45",
+      "topic": "sabr",
+      "recitationSec": 12.4,
+      "status": "PROPOSED",
+      "why": "Seek help through patience and prayer; general principle."
+    },
+    {
+      "ref": "94:5",
+      "topic": "rajaa",
+      "recitationSec": 4.5,
+      "status": "PROPOSED",
+      "why": "With hardship comes ease — widely used general reminder."
+    },
+    {
+      "ref": "94:6",
+      "topic": "rajaa",
+      "recitationSec": 4.2,
+      "status": "PROPOSED",
+      "why": "Repetition of the promise of ease."
+    },
+    {
+      "ref": "3:139",
+      "topic": "rajaa",
+      "recitationSec": 12.9,
+      "status": "PROPOSED",
+      "why": "Do not weaken or grieve; revealed after Uhud, commonly used for hope — reviewer to confirm framing."
+    },
+    {
+      "ref": "8:46",
+      "topic": "sabr",
+      "recitationSec": 17,
+      "status": "PROPOSED",
+      "why": "Ends 'be patient; Allah is with the patient' — battle context, general principle; reviewer to confirm framing."
+    },
+    {
+      "ref": "11:115",
+      "topic": "sabr",
+      "recitationSec": 8.6,
+      "status": "PROPOSED",
+      "why": "Be patient; Allah does not waste the reward of the doers of good."
+    },
+    {
+      "ref": "2:152",
+      "topic": "shukr",
+      "recitationSec": 10.4,
+      "status": "AI_APPROVED",
+      "why": "Remember Me, I will remember you; be grateful.",
+      "aiReview": "Using this verse as a general reminder for gratitude and remembrance of God is fully aligned with classical and contemporary exegesis. The translation provided is accurate, and the application does not distort or misrepresent the scriptural context."
+    },
+    {
+      "ref": "14:7",
+      "topic": "shukr",
+      "recitationSec": 15.6,
+      "status": "PROPOSED",
+      "why": "If you are grateful, I will increase you."
+    },
+    {
+      "ref": "55:13",
+      "topic": "shukr",
+      "recitationSec": 9.6,
+      "status": "PROPOSED",
+      "why": "Which of the favours of your Lord would you deny? (refrain of Ar-Rahman)."
+    },
+    {
+      "ref": "33:41",
+      "topic": "dhikr",
+      "recitationSec": 8.6,
+      "status": "PROPOSED",
+      "why": "Remember Allah with much remembrance."
+    },
+    {
+      "ref": "13:28",
+      "topic": "dhikr",
+      "recitationSec": 18.5,
+      "status": "PROPOSED",
+      "why": "In the remembrance of Allah hearts find rest."
+    },
+    {
+      "ref": "20:14",
+      "topic": "dhikr",
+      "recitationSec": 15.8,
+      "status": "PROPOSED",
+      "why": "Establish prayer for My remembrance — Allah's address to Musa; reviewer to confirm framing."
+    },
+    {
+      "ref": "2:201",
+      "topic": "dua",
+      "recitationSec": 16.1,
+      "status": "PROPOSED",
+      "why": "Our Lord, give us good in this world and the Hereafter."
+    },
+    {
+      "ref": "3:8",
+      "topic": "dua",
+      "recitationSec": 17.3,
+      "status": "PROPOSED",
+      "why": "Our Lord, let not our hearts deviate after You have guided us."
+    },
+    {
+      "ref": "7:23",
+      "topic": "dua",
+      "recitationSec": 17.7,
+      "status": "PROPOSED",
+      "why": "Dua of Adam and Hawwa: we have wronged ourselves."
+    },
+    {
+      "ref": "14:40",
+      "topic": "dua",
+      "recitationSec": 12.9,
+      "status": "PROPOSED",
+      "why": "Dua of Ibrahim: make me an establisher of prayer."
+    },
+    {
+      "ref": "20:25",
+      "topic": "dua",
+      "recitationSec": 3.8,
+      "status": "PROPOSED",
+      "why": "Dua of Musa: my Lord, expand for me my chest."
+    },
+    {
+      "ref": "25:74",
+      "topic": "dua",
+      "recitationSec": 17.4,
+      "status": "PROPOSED",
+      "why": "Grant us from our spouses and offspring comfort of our eyes."
+    },
+    {
+      "ref": "17:24",
+      "topic": "ihsan",
+      "recitationSec": 11.4,
+      "status": "PROPOSED",
+      "why": "Lower to parents the wing of humility; my Lord, have mercy on them."
+    },
+    {
+      "ref": "16:128",
+      "topic": "ihsan",
+      "recitationSec": 12.9,
+      "status": "PROPOSED",
+      "why": "Allah is with those who fear Him and the doers of good."
+    },
+    {
+      "ref": "29:69",
+      "topic": "hidaya",
+      "recitationSec": 16.7,
+      "status": "PROPOSED",
+      "why": "Those who strive for Us — We will guide them to Our ways."
+    },
+    {
+      "ref": "1:6",
+      "topic": "hidaya",
+      "recitationSec": 5.6,
+      "status": "PROPOSED",
+      "why": "Guide us to the straight path."
+    },
+    {
+      "ref": "1:5",
+      "topic": "tawhid",
+      "recitationSec": 6.7,
+      "status": "PROPOSED",
+      "why": "You alone we worship and You alone we ask for help."
+    },
+    {
+      "ref": "112:1",
+      "topic": "tawhid",
+      "recitationSec": 3,
+      "status": "PROPOSED",
+      "why": "Say: He is Allah, the One."
+    },
+    {
+      "ref": "6:162",
+      "topic": "tawhid",
+      "recitationSec": 12.8,
+      "status": "PROPOSED",
+      "why": "My prayer, my sacrifice, my living and dying are for Allah."
+    },
+    {
+      "ref": "50:16",
+      "topic": "taqwa",
+      "recitationSec": 15.7,
+      "status": "PROPOSED",
+      "why": "We are closer to him than his jugular vein."
+    },
+    {
+      "ref": "21:35",
+      "topic": "akhira",
+      "recitationSec": 18.1,
+      "status": "PROPOSED",
+      "why": "Every soul will taste death; tested with good and evil."
+    },
+    {
+      "ref": "18:46",
+      "topic": "akhira",
+      "recitationSec": 16.4,
+      "status": "PROPOSED",
+      "why": "Wealth and children are adornment; enduring good deeds are better."
+    }
+  ]
+}

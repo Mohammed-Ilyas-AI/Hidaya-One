@@ -7,7 +7,7 @@ import type { RunContext } from "./context.ts";
 
 export interface Script { hookTa: string; hookEn: string; author: string; narrationTa: string | null }
 
-const FALLBACK = { hookTa: "கஷ்டமான நேரத்தில் என்ன செய்வது?", hookEn: "Going through a hard time?" };
+const FALLBACK = { hookTa: "இன்றைய நினைவூட்டல்", hookEn: "Today's reminder" };
 
 /** Editorial text must not contain Arabic (no quotes from memory), quotation marks, or exceed length. */
 export function editorialOk(s: string, lang: "ta" | "en"): boolean {
@@ -16,11 +16,11 @@ export function editorialOk(s: string, lang: "ta" | "en"): boolean {
   return lang === "ta" ? sc.has("TAMIL") : sc.has("LATIN") && !sc.has("TAMIL");
 }
 
-export async function writeScript(ctx: RunContext, rec: AyahRecord): Promise<{ value: Script; summary: string; llm?: string }> {
+export async function writeScript(ctx: RunContext, rec: AyahRecord, topicEn = "patience (sabr)"): Promise<{ value: Script; summary: string; llm?: string }> {
   try {
     const r = await chat(ctx.textModel,
       "You write one-line hooks for 30-second Islamic reminder Shorts. Never quote or paraphrase scripture. Output JSON {\"ta\":\"...\",\"en\":\"...\"}, each under 40 characters, a gentle question.",
-      `Topic: patience (sabr). The verse shown after the hook is ${rec.sourceId}.`);
+      `Topic: ${topicEn}. The verse shown after the hook is ${rec.sourceId}; its meaning (Saheeh International): "${rec.translations.find((t) => t.lang === "en")?.text}". Write a hook that makes a viewer want to hear it, without quoting it.`);
     const j = JSON.parse(r.text.replace(/```json|```/g, ""));
     if (editorialOk(j.ta, "ta") && editorialOk(j.en, "en"))
       return { value: { hookTa: j.ta, hookEn: j.en, author: ctx.textModel, narrationTa: null }, summary: `hook by ${ctx.textModel}: "${j.en}"`, llm: ctx.textModel };

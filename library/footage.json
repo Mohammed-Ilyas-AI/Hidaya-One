@@ -1,0 +1,14 @@
+{
+  "_about": "Footage library: licensed Adobe Stock clips (founder's Adobe account), transcoded to 1080x1920 30 fps H.264, stored in library/footage/ (git-ignored). Re-download with asset_license_and_download_stock (already licensed — no new charge). grade = HyperFrames media-treatment adjust/details applied for text legibility.",
+  "clips": [
+    { "mood": "night",        "file": "night-milkyway.mp4",  "stockId": "1552975683", "title": "Vertical Milky Way galaxy time lapse", "grade": { "adjust": { "exposure": -0.1, "contrast": 0.12, "blacks": -0.1, "vibrance": 0.15 } } },
+    { "mood": "dawn",         "file": "dunes-golden.mp4",    "stockId": "333640524",  "title": "Al Wathba desert early morning timelapse", "grade": { "adjust": { "exposure": -0.55, "contrast": 0.1, "highlights": -0.45, "temperature": 0.08, "vibrance": 0.1 } } },
+    { "mood": "dunes",        "file": "dunes-golden.mp4",    "stockId": "333640524",  "title": "Al Wathba desert early morning timelapse", "grade": { "adjust": { "exposure": -0.55, "contrast": 0.1, "highlights": -0.45, "temperature": 0.08, "vibrance": 0.1 } } },
+    { "mood": "sunrise",      "file": "desert-sunrise.mp4",  "stockId": "591852748",  "title": "Aerial sunrise in desert, Mongolia", "grade": { "adjust": { "exposure": -0.35, "contrast": 0.12, "highlights": -0.4, "temperature": 0.06, "vibrance": 0.15 } } },
+    { "mood": "ocean-dawn",   "file": "ocean-dawn.mp4",      "stockId": "521744268",  "title": "Sunrise reflecting on the beach, golden light", "grade": { "adjust": { "exposure": -0.4, "contrast": 0.1, "highlights": -0.4, "vibrance": 0.1 } } },
+    { "mood": "sky-light",    "file": "sky-light.mp4",       "stockId": "264214858",  "title": "Time lapse sun shining through clouds", "grade": { "adjust": { "exposure": -0.45, "contrast": 0.12, "highlights": -0.45, "vibrance": 0.1 } } },
+    { "mood": "mist",         "file": "mist-mountains.mp4",  "stockId": "706223685",  "title": "Aerial smoky mountains under morning mist", "grade": { "adjust": { "exposure": -0.3, "contrast": 0.15, "highlights": -0.3, "vibrance": 0.1 } } },
+    { "mood": "forest-light", "file": "forest-light.mp4",    "stockId": "412718470",  "title": "Foggy pine forest with sunrise rays", "grade": { "adjust": { "exposure": -0.3, "contrast": 0.12, "highlights": -0.35, "vibrance": 0.12 } } },
+    { "mood": "rain-night",   "file": "rain-night.mp4",      "stockId": "747508636",  "title": "Rain drops on a window at night", "grade": { "adjust": { "exposure": -0.15, "contrast": 0.1, "vibrance": 0.1 } } }
+  ]
+}

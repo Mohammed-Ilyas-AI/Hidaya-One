@@ -4,13 +4,13 @@ import type { AyahRecord, Check, VerificationReport } from "../types.ts";
 import type { Script } from "./script.ts";
 import type { RunContext } from "./context.ts";
 
-export function buildMetadata(rec: AyahRecord, sc: Script, ver: VerificationReport, qc: Check[]) {
+export function buildMetadata(rec: AyahRecord, sc: Script, ver: VerificationReport, qc: Check[], topicEn = "Patience") {
   const ta = rec.translations.find((t) => t.lang === "ta")!, en = rec.translations.find((t) => t.lang === "en")!;
-  const ref = `Al-Baqarah ${rec.surahNumber}:${rec.ayahNumber}`;
+  const ref = `${rec.surahNameEn} ${rec.surahNumber}:${rec.ayahNumber}`;
   const releasable = ver.verdict === "VERIFIED" && !qc.some((c) => c.status === "FAIL");
   return {
     snippet: {
-      title: `Struggling? Seek help through patience and prayer | ${ref} #Shorts`,
+      title: `${sc.hookEn.replace(/[?.!]+$/, "")}? | ${ref} | ${topicEn} #Shorts`.slice(0, 100),
       description: [
         `${sc.hookTa}`, "",
         rec.arabic.text, "",
@@ -18,16 +18,16 @@ export function buildMetadata(rec: AyahRecord, sc: Script, ver: VerificationRepo
         `${en.text}`, `— ${en.editionName}`, "",
         `Qur'an ${ref}. Recitation: ${rec.recitation?.reciter}.`,
         "Qur'an text: Tanzil Project (tanzil.net). Translations via alquran.cloud.",
-        "#Sabr #Patience #Quran #பொறுமை #Hidayah",
+        `#Quran #${topicEn.replace(/[^A-Za-z]/g, "")} #IslamicReminder #Hidayah #Shorts`,
       ].join("\n"),
-      tags: ["sabr", "patience", "quran", "Al-Baqarah 2:153", "பொறுமை", "islamic reminder", "Hidayah"],
+      tags: ["quran", topicEn.toLowerCase(), ref, "islamic reminder", "Hidayah", "Quran recitation", "Mishary Alafasy"],
       categoryId: "27",
       defaultLanguage: "ta",
     },
     status: {
       privacyStatus: "private",                 // always explicit — never rely on the API default
       selfDeclaredMadeForKids: false,
-      containsSyntheticMedia: false,            // painted motion graphics, no realistic AI people/places
+      containsSyntheticMedia: false,            // real licensed stock footage + typography; no AI-generated realistic media
     },
     paidProductPlacementDetails: { hasPaidProductPlacement: false },
     hidayah: {
@@ -39,7 +39,7 @@ export function buildMetadata(rec: AyahRecord, sc: Script, ver: VerificationRepo
   };
 }
 
-export async function channelManager(_ctx: RunContext, rec: AyahRecord, sc: Script, ver: VerificationReport, qc: Check[]) {
-  const md = buildMetadata(rec, sc, ver, qc);
+export async function channelManager(_ctx: RunContext, rec: AyahRecord, sc: Script, ver: VerificationReport, qc: Check[], topicEn = "Patience") {
+  const md = buildMetadata(rec, sc, ver, qc, topicEn);
   return { value: md, summary: `metadata ready, privacy=private, gate=${md.hidayah.releaseGate}, upload not connected` };
 }

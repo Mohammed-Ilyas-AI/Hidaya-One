@@ -65,7 +65,7 @@ export function layoutChecks(r: RenderResult, sb: Storyboard): Check[] {
   ];
 }
 
-export function mediaChecks(file: string, sb: Storyboard): Check[] {
+export function mediaChecks(file: string, sb: { duration: number; recitationStart: number }): Check[] {
   const c: Check[] = [];
   const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", file]).toString());
   const v = probe.streams.find((s: any) => s.codec_type === "video"), a = probe.streams.find((s: any) => s.codec_type === "audio");
@@ -105,4 +105,48 @@ export async function qualityControl(ctx: RunContext, sb: Storyboard, rec: AyahR
     { id: "ai.multimodal-review", status: "SKIPPED" as const, detail: "Gemini multimodal QC unavailable (billing) — human review required" }];
   const fails = checks.filter((c) => c.status === "FAIL");
   return { value: checks, summary: `${checks.filter((c) => c.status === "PASS").length}/${checks.length} PASS, ${fails.length} FAIL, ${checks.filter((c) => c.status === "WARN").length} WARN` };
+}
+
+// ---------------- HyperFrames build QC ----------------
+const HF_FONT: Record<string, string> = {
+  ar: "studio/_template/assets/fonts/AmiriQuran.ttf",
+  ta: "studio/_template/assets/fonts/noto-serif-tamil-tamil-500-normal.woff2",
+  en: "studio/_template/assets/fonts/cormorant-garamond-latin-500-italic.woff2",
+};
+const langOf = (id: string) => (/-ar|title/.test(id) ? "ar" : /-ta/.test(id) ? "ta" : "en");
+
+export function builtTextChecks(onScreen: { id: string; text: string; source: string; exact: string }[], rec: AyahRecord): Check[] {
+  const all = [rec.arabic, ...rec.translations];
+  const c: Check[] = [];
+  for (const o of onScreen) {
+    const lang = langOf(o.id), sc = scriptsOf(o.text);
+    c.push(sc.has(WANT[lang]) && (lang !== "en" || !sc.has("ARABIC"))
+      ? { id: `text.${o.id}.script`, status: "PASS", detail: [...sc].join("+") }
+      : { id: `text.${o.id}.script`, status: "FAIL", detail: `expected ${WANT[lang]}, found ${[...sc].join("+")}` });
+    if (o.exact === "editorial") continue;
+    const src = all.find((x) => x.editionId === o.source);
+    const ok = src && (o.exact === "full" ? src.text.trim() === o.text : src.text.includes(o.text));
+    c.push(ok ? { id: `text.${o.id}.matches-source`, status: "PASS", detail: `${o.exact} match with ${o.source}` }
+      : { id: `text.${o.id}.matches-source`, status: "FAIL", detail: `not verbatim in ${o.source}` });
+  }
+  return c;
+}
+
+export function builtGlyphChecks(outDir: string, onScreen: { id: string; text: string }[]): Check[] {
+  const items = onScreen.map((o) => ({ id: o.id, font: HF_FONT[langOf(o.id)], text: o.text }));
+  const f = path.join(outDir, "glyph-items.json");
+  writeFileSync(f, JSON.stringify(items));
+  const rep = JSON.parse(execFileSync("python3", ["-I", "src/qc/glyph_coverage.py", f]).toString());
+  return rep.map((r: any) => r.missing.length
+    ? { id: `glyphs.${r.id}`, status: "FAIL", detail: `${r.font} missing ${r.missing.join(", ")}` }
+    : { id: `glyphs.${r.id}`, status: "PASS", detail: `${r.font} covers every character` });
+}
+
+export function hfCheckToChecks(json: any): Check[] {
+  const c: Check[] = [{ id: "hyperframes.check", status: json?.ok ? "PASS" : "FAIL", detail: json?.ok ? "lint, runtime, layout, contrast, craft, audio" : "hyperframes check failed" }];
+  for (const k of ["lint", "runtime", "layout", "contrast", "craft", "audio"])
+    for (const f of json?.[k]?.findings ?? [])
+      if (f.severity === "error" || (f.severity === "warning" && f.code !== "timeline_track_too_dense"))
+        c.push({ id: `hyperframes.${k}.${f.code}`, status: f.severity === "error" ? "FAIL" : "WARN", detail: `t=${f.time} ${f.selector ?? ""} ${String(f.message).slice(0, 120)}` });
+  return c;
 }

@@ -17,11 +17,12 @@ async function getJson(url: string): Promise<any> {
   return r.json();
 }
 
-export async function research(ctx: RunContext): Promise<{ value: AyahRecord; summary: string; llm?: string }> {
-  const topics = JSON.parse(readFileSync("registry/topics.json", "utf8"));
-  const approved = (topics[ctx.topic] ?? []).filter((e: any) => e.status === "APPROVED");
-  if (!approved.length) throw new Error(`no APPROVED ayah for topic "${ctx.topic}"`);
-  const ref: string = approved[0].ref;
+export async function research(ctx: RunContext, refIn?: string): Promise<{ value: AyahRecord; summary: string; llm?: string }> {
+  const reg = JSON.parse(readFileSync("registry/verses.json", "utf8"));
+  const entry = refIn ? reg.verses.find((v: any) => v.ref === refIn) : reg.verses.find((v: any) => v.topic === ctx.topic);
+  if (!entry) throw new Error(`verse ${refIn ?? ctx.topic} is not in registry/verses.json — only registry verses can be produced`);
+  if (entry.status === "REJECTED") throw new Error(`verse ${entry.ref} is REJECTED in the registry`);
+  const ref: string = entry.ref;
   const [s, a] = ref.split(":").map(Number);
 
   // Live Gemini call: ask for additional candidate ayat (suggestions only, never used as text).
@@ -56,6 +57,7 @@ export async function research(ctx: RunContext): Promise<{ value: AyahRecord; su
   mkdirSync(path.join(ctx.outDir, "assets"), { recursive: true });
   const localPath = path.join(ctx.outDir, "assets", "recitation.mp3");
   writeFileSync(localPath, buf);
+  if (buf.length < 10000) throw new Error(`recitation download failed for ${ref}`);
   const durationSec = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", localPath]).toString());
 
   const rec: AyahRecord = {

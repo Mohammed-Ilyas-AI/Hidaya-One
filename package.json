@@ -7,9 +7,10 @@
   "scripts": {
     "adk:web": "npx @google/adk-devtools web",
     "adk:run": "npx @google/adk-devtools run agent.ts",
-    "produce": "NODE_USE_ENV_PROXY=1 node --no-warnings --experimental-strip-types src/run.ts",
+    "produce": "NODE_USE_ENV_PROXY=1 node --no-warnings --experimental-strip-types src/produce.ts",
     "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "produce:legacy": "NODE_USE_ENV_PROXY=1 node --no-warnings --experimental-strip-types src/run.ts"
   },
   "dependencies": {
     "@fontsource/amiri-quran": "^5.3.0",
