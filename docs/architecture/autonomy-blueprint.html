@@ -1,0 +1,213 @@
+<title>Hidayah Autonomy Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, wide tables/diagrams scroll inside their own frames; gold = "ours" (brain), teal = LLM worker */
+:root{
+  --bg:#F6F7F8; --surface:#FFFFFF; --ink:#14212B; --muted:#5A6873; --line:#DCE2E6;
+  --brain:#A8741A; --brain-soft:#F6ECD8; --llm:#0E7C86; --llm-soft:#DCEFF1; --warn:#B4442E; --ok:#2F7D4F;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E161C; --surface:#15212A; --ink:#E7EDF1; --muted:#9AAAB5; --line:#273743;
+  --brain:#E2B45E; --brain-soft:#2E2617; --llm:#4FC3CC; --llm-soft:#12303A; --warn:#F08A72; --ok:#6CC795; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E161C; --surface:#15212A; --ink:#E7EDF1; --muted:#9AAAB5; --line:#273743;
+  --brain:#E2B45E; --brain-soft:#2E2617; --llm:#4FC3CC; --llm-soft:#12303A; --warn:#F08A72; --ok:#6CC795; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--body)}
+.wrap{max-width:980px;margin:0 auto;padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700}
+h2{font-size:clamp(22px,3vw,28px);font-weight:700}
+h3{font-size:17px;font-weight:700}
+p{margin:0;max-width:68ch}
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:18px}
+.lead{font-size:17px;color:var(--muted)}
+.key{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font:500 12px/1.6 var(--mono);white-space:nowrap}
+.c-brain{background:var(--brain-soft);color:var(--brain)} .c-llm{background:var(--llm-soft);color:var(--llm)}
+.c-ok{color:var(--ok);border:1px solid currentColor} .c-todo{color:var(--warn);border:1px solid currentColor} .c-part{color:var(--brain);border:1px solid currentColor}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.box.brain{border-top:3px solid var(--brain)}
+.box p{font-size:14px;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+.frame{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:820px;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font:500 11.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td b{font-family:var(--display);font-size:14.5px}
+.num{font:700 13px var(--mono);color:var(--brain)}
+pre.mermaid{margin:0;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+pre.code{margin:0;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto;font:12.5px/1.55 var(--mono);color:var(--ink)}
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.rung{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.rung .lvl{font:700 13px var(--mono)} .rung.now{outline:2px solid var(--brain)}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px} li{max-width:66ch}
+.muted{color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:14px">
+  <span class="eyebrow">Hidaya One · architecture · 24 Nov 2026</span>
+  <h1>The brain is code. The LLMs are hired hands.</h1>
+  <p class="lead">How Hidayah runs a Tamil–Arabic–English Qur'an channel on YouTube and Instagram with nine specialised agents. Gemini does the language work, but every decision, rule, memory and gate lives in our own typed code and data. There are no free-form instruction files steering it.</p>
+  <div class="key"><span><span class="chip c-brain">ours</span> deterministic code, data, policy</span><span><span class="chip c-llm">LLM</span> Gemini, bounded task, schema-checked output</span><span><span class="chip c-ok">built</span> <span class="chip c-part">partial</span> <span class="chip c-todo">to build</span> status today</span></div>
+</header>
+
+<section>
+  <span class="eyebrow">1 · The principle</span>
+  <h2>What "our brain" means in practice</h2>
+  <p>An LLM agent driven by a markdown prompt decides for itself what to do, what is true and when it is done. Hidayah inverts that: the brain decides <em>what</em> happens and <em>whether</em> it is allowed; the LLM only produces a bounded piece of language that the brain then validates.</p>
+  <div class="frame"><table>
+    <thead><tr><th style="width:22%">Concern</th><th>Plain prompt-file agents</th><th>Hidayah (brain is ours)</th></tr></thead>
+    <tbody>
+      <tr><td><b>Instructions</b></td><td>Long .md file the model reads and interprets</td><td><code>AgentSpec</code> objects in TypeScript: role, input and output schemas, tools, policies, model and budget. Prompts are <em>compiled</em> from typed state at run time, versioned, and tested with evals.</td></tr>
+      <tr><td><b>Decisions</b></td><td>Model chooses the next step</td><td>A state machine chooses. Each transition has a guard written in code (for example, verification VERIFIED and budget reserved).</td></tr>
+      <tr><td><b>Truth</b></td><td>Model memory and web snippets</td><td>Source registry: Qur'an text from two independent editions compared byte-for-byte; the model is never a source.</td></tr>
+      <tr><td><b>Output</b></td><td>Free text, parsed hopefully</td><td>JSON Schema output (Gemini <code>responseSchema</code>), validated with Zod; invalid output means retry or fall back to a template.</td></tr>
+      <tr><td><b>Memory</b></td><td>Chat history</td><td>Firestore collections: channel state, registry, asset library, decisions ledger, performance history.</td></tr>
+      <tr><td><b>Learning</b></td><td>"Write better next time"</td><td>Analytics feed a scoring model (bandit over topic × look × slot) whose weights the Strategist reads. The numbers change, not the prose.</td></tr>
+      <tr><td><b>Safety</b></td><td>"Please don't…" in the prompt</td><td>Policy engine with tests: private-only uploads, licence checks, no scripture from models, spend caps, kill switch. An LLM cannot reach a tool that breaks a policy.</td></tr>
+    </tbody></table></div>
+</section>
+
+<section>
+  <span class="eyebrow">2 · The brain</span>
+  <h2>Five parts we own</h2>
+  <div class="grid">
+    <div class="box brain"><h3>Policy engine</h3><p>Rules as code with unit tests: religious-accuracy gates, licence and attribution, platform rules (private-first, AI disclosure), budget and rate limits, autonomy level. <span class="chip c-part">partial</span></p></div>
+    <div class="box brain"><h3>State &amp; memory</h3><p>Firestore: <code>verses</code>, <code>assets</code>, <code>jobs</code>, <code>decisions</code>, <code>posts</code>, <code>metrics</code>. Every agent reads and writes typed records, never chat history. <span class="chip c-part">JSON files today</span></p></div>
+    <div class="box brain"><h3>Contracts</h3><p>Zod and JSON Schema for every agent's input and output, plus a <code>Decision</code> record (who, what, evidence, model, cost) for each step. <span class="chip c-part">partial</span></p></div>
+    <div class="box brain"><h3>Orchestrator</h3><p>A durable state machine (Cloud Workflows outside, an ADK graph inside). It handles retries, timeouts, idempotency keys, human-review holds and the kill switch. <span class="chip c-part">local today</span></p></div>
+    <div class="box brain"><h3>Learning loop</h3><p>YouTube Analytics and Instagram Insights → features → Thompson-sampling weights for topic, look, hook style and posting slot. Guarded so it can never pick an unapproved verse. <span class="chip c-todo">to build</span></p></div>
+  </div>
+  <pre class="code">// An agent is data + code, not a prompt file
+export const ScriptAgent: AgentSpec&lt;ScriptIn, ScriptOut&gt; = {
+  id: "script", model: "gemini-3.8-flash", maxCostUsd: 0.01, timeoutMs: 60_000,
+  input: ScriptIn,                       // Zod: verse ref, topic, translation (from registry), past hooks
+  output: ScriptOut,                     // Zod: { hookTa ≤40 chars, hookEn ≤40 chars, style: enum }
+  prompt: (s) =&gt; compile(hookTemplate, { topic: s.topic, meaning: s.translation.en, avoid: s.recentHooks }),
+  policies: [noScriptureInEditorial, noQuotes, lengthLimit, notRepeatedLast30],
+  fallback: (s) =&gt; templateHook(s.topic),  // used when output fails a policy or the model is down
+  evals: "evals/script.golden.json",       // must pass in CI before a prompt change ships
+};</pre>
+</section>
+
+<section>
+  <span class="eyebrow">3 · The nine agents</span>
+  <h2>Who does what, and where the LLM is allowed in</h2>
+  <div class="frame"><table>
+    <thead><tr><th>#</th><th style="width:15%">Agent</th><th style="width:22%">Ours (decides)</th><th style="width:22%">LLM (bounded task)</th><th>Outputs</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><b>Orchestrator / Channel Director</b></td><td>Daily and weekly plan, job state machine, retries, autonomy level, kill switch</td><td>None. Writes a plain-language daily report only.</td><td>Jobs, schedule, report</td><td><span class="chip c-part">local</span></td></tr>
+      <tr><td class="num">2</td><td><b>Strategist</b></td><td>Topic rotation and bandit weights from analytics; only registry verses are eligible</td><td>Suggests new candidate verse references (never text) for human review</td><td>Plan: verse, topic, look, slot</td><td><span class="chip c-part">rotation only</span></td></tr>
+      <tr><td class="num">3</td><td><b>Researcher</b></td><td>Fetches canonical Arabic (two editions), translations, Alafasy recitation; hashes everything</td><td>None on scripture</td><td>SourceRecord</td><td><span class="chip c-ok">built</span></td></tr>
+      <tr><td class="num">4</td><td><b>Verifier</b></td><td>Byte-equality across sources, script and hash checks, registry status ladder</td><td>Context review: "does this verse fit this topic?" Can only block, never approve alone</td><td>VERIFIED or BLOCKED + evidence</td><td><span class="chip c-ok">built</span></td></tr>
+      <tr><td class="num">5</td><td><b>Scriptwriter</b></td><td>Length, script, no-quote, no-repeat policies; template fallback</td><td>Tamil and English hook, captions, descriptions (schema output)</td><td>ScriptOut</td><td><span class="chip c-ok">built</span></td></tr>
+      <tr><td class="num">6</td><td><b>Creative Director</b></td><td>Mood → footage plates from the Adobe library; phrase timing from recitation pauses; waqf-only splits</td><td>Optional: ranks two or three looks for variety (schema output)</td><td>Storyboard + HyperFrames project</td><td><span class="chip c-ok">built</span></td></tr>
+      <tr><td class="num">7</td><td><b>Producer</b></td><td>HyperFrames check and render, grading via <code>media-treatment</code>, loudness to −14 LUFS</td><td>Gemini TTS narration (Tamil/English) when enabled</td><td>MP4 1080×1920</td><td><span class="chip c-ok">built</span> TTS <span class="chip c-todo">blocked</span></td></tr>
+      <tr><td class="num">8</td><td><b>QA Guardian</b></td><td>33 checks: verbatim source, glyph coverage, layout, safe zone, loudness, duration, black frames</td><td>Multimodal "watch the video" review; can only add a HOLD</td><td>PASS / HOLD + report</td><td><span class="chip c-ok">built</span> multimodal <span class="chip c-todo">to build</span></td></tr>
+      <tr><td class="num">9</td><td><b>Distributor &amp; Community</b></td><td>YouTube and Instagram publishing, schedule, de-duplication, analytics collection</td><td>Drafts replies to comments; a human approves them (never auto-posted)</td><td>Post IDs, metrics</td><td>YouTube <span class="chip c-part">ready, draft-only</span> Instagram <span class="chip c-todo">to build</span></td></tr>
+    </tbody></table></div>
+  <p class="muted">Agents never talk to each other in free text. Each one reads typed records, does its step, writes a typed result and a <code>Decision</code>, and the Orchestrator moves the job forward only if the result passes its guard.</p>
+</section>
+
+<section>
+  <span class="eyebrow">4 · How a video is made</span>
+  <h2>One Short, end to end</h2>
+<pre class="mermaid">
+flowchart LR
+  P["2 Strategist<br/>picks verse + slot"] --> R["3 Researcher<br/>2 editions + recitation"]
+  R --> V{"4 Verifier<br/>bytes equal?<br/>topic fits?"}
+  V -- blocked --> H["Hold for<br/>human review"]
+  V -- verified --> S["5 Scriptwriter<br/>hook (schema)"]
+  S --> C["6 Creative<br/>phrases at waqf<br/>+ Adobe plates"]
+  C --> K{"HyperFrames<br/>check"}
+  K -- fail --> H
+  K -- ok --> PR["7 Producer<br/>render + grade<br/>+ loudness"]
+  PR --> Q{"8 QA Guardian<br/>33 checks"}
+  Q -- hold --> H
+  Q -- pass --> D["9 Distributor<br/>YouTube private<br/>+ Instagram Reel"]
+  D --> A["Analytics<br/>→ learning loop"]
+  A --> P
+</pre>
+  <div class="grid">
+    <div class="box"><h3>Where the footage comes from</h3><p>Adobe Stock clips licensed through your Express Premium account (9 plates, 8 moods so far), plus Firefly images you generate. They're stored in a footage library on Cloud Storage with mood tags and a grade preset each.</p></div>
+    <div class="box"><h3>How the text stays exact</h3><p>Arabic is split only at the verse's own waqf marks; translations only at matching sentence breaks; otherwise the whole verse is shown. Every on-screen line is re-checked against its source after the build.</p></div>
+    <div class="box"><h3>What one Short costs</h3><p>Footage is free-tier Stock (already licensed). Each Short makes about three short Gemini calls, costing well under one cent. Rendering takes about 15 minutes of CPU, which on a Cloud Run Job is a few cents.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">5 · Distribution</span>
+  <h2>YouTube and Instagram from the same master</h2>
+  <div class="grid">
+    <div class="box"><h3>YouTube Shorts</h3><ul>
+      <li>Data API v3, Desktop OAuth client (project <span class="mono">hidaya-one-youtube</span>), refresh token stored in Secret Manager</li>
+      <li>Upload always <code>private</code>, then <code>publishAt</code> per slot (07:00 / 13:00 / 19:30 IST)</li>
+      <li>De-duplicated by ledger and a hidden tag; quota 100 uploads/day</li>
+      <li>Analytics API: retention, engaged views, subscribers gained</li></ul></div>
+    <div class="box"><h3>Instagram Reels</h3><ul>
+      <li>Instagram Graph API with an Instagram Professional (Business or Creator) account, through a Meta app with content-publish permission</li>
+      <li>Flow: create a REELS media container from a public video URL (a short-lived Cloud Storage signed URL), wait for <code>FINISHED</code>, then <code>media_publish</code></li>
+      <li>Same 1080×1920 master; caption adapted per platform (hashtags, Tamil first line)</li>
+      <li>Insights API for plays, reach and saves feed the same learning loop</li></ul></div>
+  </div>
+  <p class="muted">You'll need to provide for Instagram: the Instagram account switched to Professional, a Meta developer app, and approval of the publishing permission. Until that exists the Distributor produces Reels-ready files and captions only.</p>
+</section>
+
+<section>
+  <span class="eyebrow">6 · Where it runs</span>
+  <h2>Google Cloud layout</h2>
+<pre class="mermaid">
+flowchart TB
+  subgraph Brain["Ours (Google Cloud)"]
+    SCH["Cloud Scheduler<br/>daily + weekly"] --> WF["Cloud Workflows<br/>job state machine"]
+    WF --> API["Cloud Run: agent-api<br/>ADK TypeScript agents"]
+    WF --> REN["Cloud Run Job: renderer<br/>HyperFrames + Chromium + FFmpeg"]
+    API --> FS[("Firestore<br/>registry · jobs · decisions · metrics")]
+    REN --> GCS[("Cloud Storage<br/>footage library · renders")]
+    SM["Secret Manager<br/>YouTube + Meta tokens"] -.-> API
+  end
+  API -- "bounded prompts,<br/>schema output" --> GEM["Gemini 3.8 Flash / TTS"]
+  API --> YT["YouTube Data + Analytics"]
+  API --> IG["Instagram Graph"]
+  AD["Adobe Express Premium<br/>(Claude session, weekly)"] -- "licensed clips + Firefly images" --> GCS
+</pre>
+  <p class="muted">The Adobe connection only works inside a Claude session, not from Cloud Run. So asset sourcing is a weekly step: Claude licenses or collects new plates into the library, and the autonomous loop uses whatever is in the library.</p>
+</section>
+
+<section>
+  <span class="eyebrow">7 · Autonomy</span>
+  <h2>Four levels, raised only by you</h2>
+  <div class="ladder">
+    <div class="rung now"><span class="lvl" style="color:var(--brain)">L0 · now</span><b>Draft only</b><span class="muted">Everything produced and checked; nothing leaves the system.</span></div>
+    <div class="rung"><span class="lvl">L1</span><b>Private upload</b><span class="muted">Uploads as private to YouTube; you approve each one in Studio.</span></div>
+    <div class="rung"><span class="lvl">L2</span><b>Scheduled</b><span class="muted">Scholar-approved verses go out on their slot automatically; anything else waits.</span></div>
+    <div class="rung"><span class="lvl">L3</span><b>Full loop</b><span class="muted">Learning loop picks topics and slots; Instagram cross-posts. Kill switch and spend caps always on.</span></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">8 · Build order</span>
+  <h2>From today's code to the autonomous manager</h2>
+  <div class="frame"><table>
+    <thead><tr><th>Step</th><th>What</th><th>Done when</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><b>Brain kernel</b>: <code>AgentSpec</code>, Zod contracts, <code>Decision</code> ledger, policy engine with tests; port the nine agents onto it</td><td>Every agent step writes a validated Decision; the policy tests pass</td></tr>
+      <tr><td class="num">2</td><td><b>State to Firestore</b>: registry, assets, jobs, posts; footage library to Cloud Storage</td><td>No JSON-file state left; jobs are idempotent</td></tr>
+      <tr><td class="num">3</td><td><b>Cloud runtime</b>: renderer as a Cloud Run Job, agent-api on Cloud Run, Workflows + Scheduler</td><td>A Short is produced with no laptop or Claude session involved</td></tr>
+      <tr><td class="num">4</td><td><b>YouTube L1</b>: token in Secret Manager, private uploads, analytics collector</td><td>Seven days of private uploads with no duplicates</td></tr>
+      <tr><td class="num">5</td><td><b>Instagram</b>: Meta app, Reels container publish, Insights collector</td><td>One Reel posted from the same master</td></tr>
+      <tr><td class="num">6</td><td><b>Learning loop</b>: bandit weights, weekly report, Strategist reads weights</td><td>The topic and slot mix changes based on measured retention</td></tr>
+    </tbody></table></div>
+</section>
+
+</div>
