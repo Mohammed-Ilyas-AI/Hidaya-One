@@ -114,7 +114,7 @@ export const ScriptAgent: AgentSpec&lt;ScriptIn, ScriptOut&gt; = {
       <tr><td class="num">6</td><td><b>Creative Director</b></td><td>Mood → footage plates from the Adobe library; phrase timing from recitation pauses; waqf-only splits</td><td>Optional: ranks two or three looks for variety (schema output)</td><td>Storyboard + HyperFrames project</td><td><span class="chip c-ok">built</span></td></tr>
       <tr><td class="num">7</td><td><b>Producer</b></td><td>HyperFrames check and render, grading via <code>media-treatment</code>, loudness to −14 LUFS</td><td>Gemini TTS narration (Tamil/English) when enabled</td><td>MP4 1080×1920</td><td><span class="chip c-ok">built</span> TTS <span class="chip c-todo">blocked</span></td></tr>
       <tr><td class="num">8</td><td><b>QA Guardian</b></td><td>33 checks: verbatim source, glyph coverage, layout, safe zone, loudness, duration, black frames</td><td>Multimodal "watch the video" review; can only add a HOLD</td><td>PASS / HOLD + report</td><td><span class="chip c-ok">built</span> multimodal <span class="chip c-todo">to build</span></td></tr>
-      <tr><td class="num">9</td><td><b>Distributor &amp; Community</b></td><td>YouTube and Instagram publishing, schedule, de-duplication, analytics collection</td><td>Drafts replies to comments; a human approves them (never auto-posted)</td><td>Post IDs, metrics</td><td>YouTube <span class="chip c-part">ready, draft-only</span> Instagram <span class="chip c-todo">to build</span></td></tr>
+      <tr><td class="num">9</td><td><b>Distributor &amp; Community</b></td><td>YouTube and Instagram publishing, schedule, de-duplication, analytics collection</td><td>Drafts replies to comments; a human approves them (never auto-posted)</td><td>Post IDs, metrics</td><td>YouTube <span class="chip c-part">OAuth fixed, not yet proven live</span> Instagram <span class="chip c-todo">to build</span></td></tr>
     </tbody></table></div>
   <p class="muted">Agents never talk to each other in free text. Each one reads typed records, does its step, writes a typed result and a <code>Decision</code>, and the Orchestrator moves the job forward only if the result passes its guard.</p>
 </section>
@@ -134,7 +134,9 @@ flowchart LR
   K -- ok --> PR["7 Producer<br/>render + grade<br/>+ loudness"]
   PR --> Q{"8 QA Guardian<br/>33 checks"}
   Q -- hold --> H
-  Q -- pass --> D["9 Distributor<br/>YouTube private<br/>+ Instagram Reel"]
+  Q -- pass --> G{"Release gate<br/>autonomy level +<br/>approval bound to<br/>render hash"}
+  G -- "L0 / not approved" --> DR["Draft pack saved<br/>(MP4, captions, evidence)"]
+  G -- "L1+ approved" --> D["9 Distributor<br/>YouTube private<br/>(+ Instagram at L3)"]
   D --> A["Analytics<br/>→ learning loop"]
   A --> P
 </pre>
@@ -187,6 +189,7 @@ flowchart TB
 <section>
   <span class="eyebrow">7 · Autonomy</span>
   <h2>Four levels, raised only by you</h2>
+  <p class="muted">The Distributor acts only when the level allows it <em>and</em> a release approval exists for that exact render (hashes of script and video, channel, platform, visibility). Changing either invalidates the approval. Upload and scheduling are separate steps.</p>
   <div class="ladder">
     <div class="rung now"><span class="lvl" style="color:var(--brain)">L0 · now</span><b>Draft only</b><span class="muted">Everything produced and checked; nothing leaves the system.</span></div>
     <div class="rung"><span class="lvl">L1</span><b>Private upload</b><span class="muted">Uploads as private to YouTube; you approve each one in Studio.</span></div>
@@ -201,6 +204,7 @@ flowchart TB
   <div class="frame"><table>
     <thead><tr><th>Step</th><th>What</th><th>Done when</th></tr></thead>
     <tbody>
+      <tr><td class="num">0</td><td><b>Prove OAuth live</b>: founder signs in on Windows, then <code>--verify</code> in a fresh process</td><td>Refresh works after restart and the expected channel is identified; nothing uploaded</td></tr>
       <tr><td class="num">1</td><td><b>Brain kernel</b>: <code>AgentSpec</code>, Zod contracts, <code>Decision</code> ledger, policy engine with tests; port the nine agents onto it</td><td>Every agent step writes a validated Decision; the policy tests pass</td></tr>
       <tr><td class="num">2</td><td><b>State to Firestore</b>: registry, assets, jobs, posts; footage library to Cloud Storage</td><td>No JSON-file state left; jobs are idempotent</td></tr>
       <tr><td class="num">3</td><td><b>Cloud runtime</b>: renderer as a Cloud Run Job, agent-api on Cloud Run, Workflows + Scheduler</td><td>A Short is produced with no laptop or Claude session involved</td></tr>

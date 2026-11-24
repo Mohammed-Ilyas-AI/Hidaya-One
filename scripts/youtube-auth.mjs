@@ -5,7 +5,8 @@
 // http://127.0.0.1:<port>; that address only reaches a listener running on that same computer — not Cloud Shell,
 // not a remote/SSH terminal, not a cloud container.
 //
-//   node scripts/youtube-auth.mjs --client "C:\path\to\client_secret_XXXX.json"
+//   node scripts/youtube-auth.mjs --client "C:\path\to\client_secret_XXXX.json"     (sign in, once)
+//   node scripts/youtube-auth.mjs --verify                                          (later, any time: prove the saved token still works)
 //
 // What it does: starts a loopback listener on 127.0.0.1 (OS-chosen free port) → confirms it is listening →
 // opens Google sign-in (state + PKCE S256) → receives exactly one callback → exchanges the code → verifies
@@ -110,8 +111,34 @@ function openBrowser(url) {
   try { const c = spawn(cmd, args, { stdio: "ignore", detached: true }); c.on("error", () => {}); c.unref(); return true; } catch { return false; }
 }
 
+// ---------- --verify: fresh process, saved token → refresh → read-only channel check ----------
+async function verifySaved() {
+  const file = arg("token") ?? path.join(STORE_DIR, "youtube-token.json");
+  if (!existsSync(file)) fail(`no saved token at ${file} — run the sign-in first`);
+  const t = JSON.parse(readFileSync(file, "utf8"));
+  if (!t.refresh_token || !t.client_secret_file) fail("token file is incomplete — run the sign-in again");
+  if (!existsSync(t.client_secret_file)) fail(`client file moved or deleted: ${t.client_secret_file} — put it back or sign in again with --client`);
+  const c = JSON.parse(readFileSync(t.client_secret_file, "utf8")).installed;
+  log(`loaded saved token (created ${t.created_at}, channel "${t.channel_title}") — values not shown`);
+  const r = await fetch(TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: c.client_id, client_secret: c.client_secret, refresh_token: t.refresh_token, grant_type: "refresh_token" }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) {
+    const hint = j.error === "invalid_grant" ? " The grant was revoked or expired (an app in Testing mode expires sign-ins after 7 days). Sign in again." : "";
+    fail(`token refresh failed: HTTP ${r.status} ${j.error ?? ""}.${hint}`);
+  }
+  log("refresh succeeded (new access token obtained, not shown)");
+  const ch = await fetch(`${YT_API}/channels?part=snippet&mine=true`, { headers: { Authorization: `Bearer ${j.access_token}` } });
+  const cj = await ch.json().catch(() => ({}));
+  const item = cj.items?.[0];
+  if (!ch.ok || !item) fail(`read-only channel check failed: HTTP ${ch.status} ${cj.error?.message ?? "no channel"}`);
+  if (t.channel_id && item.id !== t.channel_id) fail(`token now points to a different channel ("${item.snippet.title}") than when saved ("${t.channel_title}")`);
+  log(`verified: token works after restart and still controls "${item.snippet.title}" (${item.id}). Nothing uploaded.`);
+}
+
 // ---------- main ----------
 async function main() {
+  if (flag("verify")) return verifySaved();
   const clientPath = arg("client") ?? process.env.HIDAYAH_YOUTUBE_CLIENT_FILE;
   if (!clientPath) fail('pass your OAuth client file: --client "C:\\path\\to\\client_secret_XXXX.json"');
   if (!existsSync(clientPath)) fail(`client file not found: ${clientPath}`);

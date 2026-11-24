@@ -16,7 +16,9 @@ async function mockGoogle() {
     let body = ""; for await (const c of req) body += c;
     if (req.url === "/token") {
       const p = new URLSearchParams(body); seen.token = Object.fromEntries(p);
-      const ok = p.get("code") === CODE && p.get("client_secret") === SECRET && (p.get("code_verifier") ?? "").length >= 43;
+      const ok = p.get("grant_type") === "refresh_token"
+        ? p.get("refresh_token") === REFRESH && p.get("client_secret") === SECRET
+        : p.get("code") === CODE && p.get("client_secret") === SECRET && (p.get("code_verifier") ?? "").length >= 43;
       res.writeHead(ok ? 200 : 400, { "Content-Type": "application/json" });
       return res.end(JSON.stringify(ok ? { access_token: "FAKE-access-token-for-tests", refresh_token: REFRESH, expires_in: 3599,
         scope: "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly", token_type: "Bearer" } : { error: "invalid_grant" }));
@@ -70,6 +72,21 @@ test("full loopback flow: listener first, state + PKCE, read-only verify, token 
   for (const s of [SECRET, REFRESH, CODE, "FAKE-access-token"]) assert.ok(!run.output().includes(s), `output must not contain ${s}`);
   assert.equal(g.seen.unexpected, undefined, "no YouTube call other than the read-only channel check");
   assert.ok(!existsSync(path.join(home, "youtube-auth.lock")), "lock released");
+  g.srv.closeAllConnections(); g.srv.close();
+});
+
+test("--verify in a fresh process refreshes the saved token and re-checks the channel read-only", async () => {
+  const g = await mockGoogle(); const { home, clientFile } = fixture();
+  const run = runAuth(home, clientFile, g.base); const url = await run.link;
+  await fetch(`${url.searchParams.get("redirect_uri")}/?state=${encodeURIComponent(url.searchParams.get("state")!)}&code=${encodeURIComponent(CODE)}`);
+  assert.equal(await run.done, 0);
+  // simulate a restart: a brand-new process that only has the saved file
+  const v = spawn(process.execPath, ["scripts/youtube-auth.mjs", "--verify"], { env: { ...process.env, HIDAYAH_HOME: home, HIDAYAH_OAUTH_TOKEN_URL: `${g.base}/token`, HIDAYAH_YOUTUBE_API: `${g.base}/yt` } });
+  let out = ""; v.stdout.on("data", (d) => (out += d)); v.stderr.on("data", (d) => (out += d));
+  assert.equal(await new Promise((r) => v.on("exit", r)), 0, out);
+  assert.match(out, /verified: token works after restart/);
+  assert.equal(g.seen.token.grant_type, "refresh_token");
+  for (const s of [SECRET, REFRESH, "FAKE-access-token"]) assert.ok(!out.includes(s));
   g.srv.closeAllConnections(); g.srv.close();
 });
 
