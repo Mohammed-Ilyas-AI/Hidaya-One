@@ -24,7 +24,9 @@ const FONTS = `
     @font-face { font-family: "Corm"; font-weight: 600; src: url("assets/fonts/cormorant-garamond-latin-600-normal.woff2"); }
     @font-face { font-family: "Corm"; font-weight: 500; font-style: italic; src: url("assets/fonts/cormorant-garamond-latin-500-italic.woff2"); }
     @font-face { font-family: "TamilSerif"; font-weight: 500; src: url("assets/fonts/noto-serif-tamil-tamil-500-normal.woff2"); }
-    @font-face { font-family: "TamilSerif"; font-weight: 600; src: url("assets/fonts/noto-serif-tamil-tamil-600-normal.woff2"); }`;
+    @font-face { font-family: "TamilSerif"; font-weight: 600; src: url("assets/fonts/noto-serif-tamil-tamil-600-normal.woff2"); }
+    @font-face { font-family: "TamilSerif"; font-weight: 500; src: url("assets/fonts/noto-serif-tamil-latin-500-normal.woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+    @font-face { font-family: "TamilSerif"; font-weight: 600; src: url("assets/fonts/noto-serif-tamil-latin-600-normal.woff2"); unicode-range: U+0000-00FF, U+2000-206F; }`;
 const BASE = `
     #root { position: absolute; inset: 0; }
     .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,6,18,0) 9%, rgba(4,6,18,var(--scrim,.45)) 22%, rgba(4,6,18,var(--scrim,.45)) 56%, rgba(4,6,18,0) 68%); }

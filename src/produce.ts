@@ -4,8 +4,8 @@
 // Usage:
 //   npm run produce -- --ref 2:152                 one Short
 //   npm run produce -- --batch 21 --start 2026-12-01   next 21 unpublished verses, scheduled 3/day
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { step, type RunContext } from "./agents/context.ts";
 import { research } from "./agents/research.ts";
@@ -26,6 +26,17 @@ const SLOTS_IST = ["07:00", "13:00", "19:30"];   // 3 Shorts/day, Asia/Kolkata
 
 function hf(dir: string, args: string[], timeoutMs = 3_600_000): string {
   return execFileSync(HF[0], [...HF.slice(1), ...args], { cwd: dir, env: { ...process.env, HYPERFRAMES_TELEMETRY: "0" }, maxBuffer: 64 << 20, timeout: timeoutMs }).toString();
+}
+/** Two-pass loudnorm to −14 LUFS / −1.5 dBTP; video stream is copied untouched. */
+export function normalizeLoudness(file: string): string {
+  const pass1 = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"], { encoding: "utf8" }).stderr;
+  const m = JSON.parse(pass1.slice(pass1.lastIndexOf("{"), pass1.lastIndexOf("}") + 1));
+  const tmp = file.replace(/\.mp4$/, ".norm.mp4");
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", file, "-af",
+    `loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,aresample=48000`,
+    "-map", "0:v", "-map", "0:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-t", String(T.DURATION), "-movflags", "+faststart", tmp]);
+  renameSync(tmp, file);
+  return `${m.input_i} LUFS → −14 LUFS`;
 }
 const firstJson = (s: string) => { const i = s.indexOf("{"); return JSON.parse(s.slice(i, s.lastIndexOf("}") + 1)); };
 
@@ -71,6 +82,7 @@ export async function produceOne(ref: string, publishAt?: string) {
 
   const final = path.join(ctx.outDir, `${id}.mp4`);
   await step(ctx, "6b render", async () => { hf(project, ["render", "--quality", "delivery", "-o", final]); return { value: final, summary: path.basename(final) }; });
+  await step(ctx, "7 editor (loudness)", async () => ({ value: null, summary: normalizeLoudness(final) }));
 
   const qc = await step(ctx, "8 quality-control", async () => {
     const checks = [...builtTextChecks(built.onScreen, rec), ...builtGlyphChecks(ctx.outDir, built.onScreen), ...hfCheckToChecks(checkJson),

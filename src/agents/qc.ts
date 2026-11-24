@@ -108,9 +108,9 @@ export async function qualityControl(ctx: RunContext, sb: Storyboard, rec: AyahR
 }
 
 // ---------------- HyperFrames build QC ----------------
-const HF_FONT: Record<string, string> = {
+const HF_FONT: Record<string, string | string[]> = {
   ar: "studio/_template/assets/fonts/AmiriQuran.ttf",
-  ta: "studio/_template/assets/fonts/noto-serif-tamil-tamil-500-normal.woff2",
+  ta: ["studio/_template/assets/fonts/noto-serif-tamil-tamil-500-normal.woff2", "studio/_template/assets/fonts/noto-serif-tamil-latin-500-normal.woff2"],
   en: "studio/_template/assets/fonts/cormorant-garamond-latin-500-italic.woff2",
 };
 const langOf = (id: string) => (/-ar|title/.test(id) ? "ar" : /-ta/.test(id) ? "ta" : "en");
