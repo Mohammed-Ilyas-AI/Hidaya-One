@@ -37,6 +37,8 @@ git clone https://github.com/Mohammed-Ilyas-AI/Hidaya-One.git
 cd Hidaya-One
 git checkout ccr-d1d7aea4-2cxbd2
 node scripts/youtube-auth.mjs --client "$HOME\Downloads\client_secret_949220497714-0rf236asgeec867se3ov23k67gi5buqd.apps.googleusercontent.com.json"
+# then close PowerShell, open a new one, cd Hidaya-One, and prove the token survives a restart:
+node scripts/youtube-auth.mjs --verify
 ```
 The script:
 1. starts a listener on `127.0.0.1` with a free port and confirms it is listening,
