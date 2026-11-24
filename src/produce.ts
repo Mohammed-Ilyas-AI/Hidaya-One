@@ -16,7 +16,7 @@ import { verify } from "./agents/verification.ts";
 import { writeScript } from "./agents/script.ts";
 import { mediaChecks, builtTextChecks, builtGlyphChecks, hfCheckToChecks } from "./agents/qc.ts";
 import { channelManager } from "./agents/channel.ts";
-import { publish, paused, publishMode } from "./agents/publisher.ts";
+import { publish, paused, publishMode, configuredChannelId } from "./agents/publisher.ts";
 import { issueRelease } from "./agents/release.ts";
 import { planPhrases } from "./hf/timing.ts";
 import { buildProject, gradeFootage, T } from "./hf/build.ts";
@@ -104,7 +104,7 @@ export async function produceOne(ref: string, publishAt?: string) {
   // Release approval, issued by code only when every gate passed and bound to this exact render.
   const rel = issueRelease({
     shortId: id, script: { script: sc, onScreen: built.onScreen }, videoFile: final, metadata: md, verification: ver, qc,
-    channelId: process.env.HIDAYAH_YOUTUBE_CHANNEL_ID, mode: publishMode(), publishAt,
+    channelId: configuredChannelId(), mode: publishMode(), publishAt,
   });
   writeJson(path.join(ctx.outDir, "release.json"), "release" in rel ? rel.release : { refused: rel.refused });
   const pub = await step(ctx, "9 distributor · publish", async () => {
@@ -156,7 +156,32 @@ async function daily() {
   return results;
 }
 
+/**
+ * Publishes a Short that is already rendered and checked (out/<id>/), without producing it again.
+ * The same gates apply: a code-issued release bound to this exact MP4 and metadata, then the publisher.
+ */
+async function publishExisting(id: string, publishAt?: string) {
+  const dir = path.join(ROOT, "out", id);
+  const read = (f: string) => JSON.parse(readFileSync(path.join(dir, f), "utf8"));
+  const final = path.join(dir, `${id}.mp4`);
+  const md = read("youtube-metadata.json"), ver = read("verification.json"), qc = read("qc.json"), build = read("build.json");
+  const rel = issueRelease({
+    shortId: id, script: { onScreen: build.onScreen }, videoFile: final, metadata: md, verification: ver, qc,
+    channelId: configuredChannelId(), mode: publishMode(), publishAt,
+  });
+  writeJson(path.join(dir, "release.json"), "release" in rel ? rel.release : { refused: rel.refused });
+  if (!("release" in rel)) return { status: "HOLD", detail: rel.refused };
+  const r = await publish(id, final, md, { publishAt, release: rel.release });
+  writeJson(path.join(dir, "publish.json"), { ...r, at: now(), mode: publishMode() });
+  return r;
+}
+
 if (import.meta.filename === path.resolve(process.argv[1] ?? "")) {
+  if (arg("publish-only")) {
+    const r: any = await publishExisting(arg("publish-only"), arg("publish-at") || undefined);
+    console.log(`publish ${arg("publish-only")}: ${r.status}${r.videoId ? ` · https://youtu.be/${r.videoId}` : ""}${r.detail ? ` · ${r.detail}` : ""}`);
+    process.exit(0);
+  }
   if (process.argv.includes("--daily")) {
     const results = await daily();
     writeJson(path.join(ROOT, "out", `daily-${now().slice(0, 10)}.json`), results);

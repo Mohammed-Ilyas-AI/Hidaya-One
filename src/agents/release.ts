@@ -7,7 +7,9 @@
 // upload if anything differs, so a changed script, video, title or schedule can never reuse an old release, and
 // no model can mint one (models never see the key and never call this module).
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
 
 export const RELEASE_VERSION = "1";
 export type Visibility = "SCHEDULED_PUBLIC" | "PUBLIC" | "PRIVATE";
@@ -44,8 +46,13 @@ export const fileHash = (file: string) => sha256(readFileSync(file));
 export const metadataHash = (md: any) => sha256(canonical({ snippet: md?.snippet, status: md?.status, paid: md?.paidProductPlacementDetails ?? null }));
 export const scriptHash = (script: unknown) => sha256(canonical(script));
 
+/** HIDAYAH_RELEASE_KEY (Secret Manager in production), else the local key file (never printed). */
 export function releaseKey(): string | null {
-  const k = process.env.HIDAYAH_RELEASE_KEY;
+  let k = process.env.HIDAYAH_RELEASE_KEY;
+  if (!k) {
+    const file = process.env.HIDAYAH_RELEASE_KEY_FILE ?? path.join(process.env.HIDAYAH_HOME ?? path.join(homedir(), ".hidayah"), "release-key");
+    if (existsSync(file)) k = readFileSync(file, "utf8").trim();
+  }
   return k && k.length >= 32 ? k : null;
 }
 

@@ -28,6 +28,17 @@ export function publishMode(): PublishMode {
   return m === "AUTONOMOUS" || m === "PRIVATE_UPLOAD" ? m : "DRAFT_ONLY";
 }
 
+/** The channel uploads must go to: HIDAYAH_YOUTUBE_CHANNEL_ID, else the channel recorded at sign-in. */
+export function configuredChannelId(): string | undefined {
+  if (process.env.HIDAYAH_YOUTUBE_CHANNEL_ID) return process.env.HIDAYAH_YOUTUBE_CHANNEL_ID;
+  const file = process.env.HIDAYAH_YOUTUBE_TOKEN_FILE ?? path.join(process.env.HIDAYAH_HOME ?? path.join(homedir(), ".hidayah"), "youtube-token.json");
+  try {
+    return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")).channel_id ?? undefined) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Owner's emergency stop: HIDAYAH_PAUSED=1, or a registry/PAUSE file (create it to pause, delete it to resume). */
 export function paused(): boolean {
   return process.env.HIDAYAH_PAUSED === "1" || existsSync(process.env.HIDAYAH_PAUSE_FILE ?? "registry/PAUSE");
